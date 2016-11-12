@@ -3,6 +3,7 @@
 """
 import numpy
 import theano
+import theano.tensor as T
 
 def NormalInit(rng, sizeX, sizeY, scale=0.01, sparsity=-1):
     """ 
@@ -47,3 +48,22 @@ def OrthogonalInit(rng, shape):
 
     n_min = min(shape[0], shape[1])
     return numpy.dot(Q1[:, :n_min], Q2[:n_min, :])
+    
+def GrabProbs(class_probs, target, gRange=None):
+    if class_probs.ndim > 2:
+        class_probs = class_probs.reshape((class_probs.shape[0] * class_probs.shape[1], class_probs.shape[2]))
+    else:
+        class_probs = class_probs
+    if target.ndim > 1:
+        tflat = target.flatten()
+    else:
+        tflat = target
+     
+    # return grabber(class_probs, target).flatten()
+    ### Hack for Theano, much faster than [x, y] indexing 
+    ### avoids a copy onto the GPU
+    return T.diag(class_probs.T[tflat])
+    
+def SoftMax(x):
+    x = T.exp(x - T.max(x, axis=x.ndim-1, keepdims=True))
+    return x / T.sum(x, axis=x.ndim-1, keepdims=True)

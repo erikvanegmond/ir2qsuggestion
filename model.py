@@ -2,7 +2,10 @@
 @author: Jaimy
 """
 import numpy as np
+import theano
 import theano.tensor as T
+
+from GRU_RNN import GRU
 
 class Model():
     
@@ -18,7 +21,7 @@ class Model():
         """
         You can see this as the Encoder class without the query weights (W)
         """
-        
+        self.session_encoder = GRU(1000, 1500, self.rng)
         # Create decoder
         """
         This is the same as the Decoder class
@@ -30,10 +33,10 @@ class Model():
         """
         Should look like something in build_encoder (lines 165-167)
         """
+        Q = []
         # Encode all the session with the given query encodings
-        """
-        Should look like something in build_encoder (lines 176-178)
-        """        
+        s_0 = T.alloc(np.float32(0), x.shape[1], self.session_encoder.h_dim)
+        S, updates = theano.scan(self.session_encoder.forward_prop_step, sequences=Q, outputs_info=[None, s_0])       
         # Decode the given session encodings
         """
         Should look like something in build_decoder
