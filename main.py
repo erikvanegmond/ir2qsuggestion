@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 
-data_path = "../AOL-user-ct-collection/"
+data_path = "../../AOL_search_data_leak_2006/"
 
 '''
     Sessions end after 30 minutes of inactivity, same definition google uses
@@ -10,7 +10,7 @@ data_path = "../AOL-user-ct-collection/"
 session_inactivity = 30
 
 
-def read_files(max_files=10) -> pd.DataFrame:
+def read_files(max_files=10): #-> pd.DataFrame:
     file_counter = 0
     df = pd.DataFrame()
     for fn in os.listdir(data_path):
@@ -23,11 +23,11 @@ def read_files(max_files=10) -> pd.DataFrame:
     return df
 
 
-def users_from_data(df: pd.DataFrame) -> pd.core.groupby.DataFrameGroupBy:
+def users_from_data(df):# -> pd.core.groupby.DataFrameGroupBy:
     return df.groupby('AnonID')
 
 
-def sessions(df: pd.DataFrame):
+def sessions(df):
     session_list = []
 
     users = users_from_data(df)
@@ -38,7 +38,7 @@ def sessions(df: pd.DataFrame):
     print(session_list)
 
 
-def session_generator(df: pd.DataFrame):
+def session_generator(df):
     '''
     :param df: dataframe to retrieve sessions from
     :return: sessions in the dataframe one by one.
@@ -49,7 +49,7 @@ def session_generator(df: pd.DataFrame):
             yield s
 
 
-def get_sessions_from_user(user: pd.DataFrame):
+def get_sessions_from_user(user):
     # suppress annoying warning
     user.is_copy = False
 
