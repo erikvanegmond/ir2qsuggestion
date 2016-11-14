@@ -20,30 +20,52 @@ class Decoder():
         self.rng = rng
         if self.rng == None:
             self.rng = np.random.RandomState(1234)
-        # Create a GRU to calculate the decoder recurrent state
-        self.GRU_dec = GRU(s_dim, q_dim, self.rng)
-        # Create output parameters
-        D_0 = NormalInit(self.rng, q_dim, s_dim)
-        b_0 = np.zeros((q_dim,), dtype='float32')
-        W_out = NormalInit(self.rng, q_dim, o_dim)
-        Ho = NormalInit(self.rng, o_dim, q_dim)
-        Eo = NormalInit(self.rng, o_dim, vocab.shape[1])
-        b_out = np.zeros((self.idim,), dtype='float32')
+        # Initialize the network parameters
+        D0 = NormalInit(self.rng, (q_dim, s_dim))
+        b0 = np.zeros((1,s_dim))
+        Ho = NormalInit(self.rng, (o_dim, q_dim))
+        Eo = NormalInit(self.rng, (o_dim, vocab.shape[0]))
+        bo = np.zeros((1,o_dim))
+        O = OrthogonalInit(self.rng, (vocab.shape[1], o_dim))
+        U = OrthogonalInit(self.rng, (3, vocab.shape[1], q_dim))
+        W = OrthogonalInit(self.rng, (3, q_dim, q_dim))
+        b = np.zeros((3, out_dim))
         # Theano: Created shared variables
-        self.D_0 = self.add_to_params(theano.shared(name='D_0', value=D_0.astype(theano.config.floatX)))
-        self.b_0 = self.add_to_params(theano.shared(name='b_0', value=b_0.astype(theano.config.floatX)))
-        self.W_out = self.add_to_params(theano.shared(name='W_out', value=W_out.astype(theano.config.floatX)))
+        self.D0 = self.add_to_params(theano.shared(name='D0', value=D0.astype(theano.config.floatX)))
+        self.b0 = self.add_to_params(theano.shared(name='b0', value=b0.astype(theano.config.floatX)))
         self.Ho = self.add_to_params(theano.shared(name='Ho', value=Ho.astype(theano.config.floatX)))
         self.Eo = self.add_to_params(theano.shared(name='Eo', value=Eo.astype(theano.config.floatX)))
-        self.b_out = self.add_to_params(theano.shared(name='b_out', value=b_out.astype(theano.config.floatX)))
+        self.bo = self.add_to_params(theano.shared(name='bo', value=bo.astype(theano.config.floatX)))
+        self.O = self.add_to_params(theano.shared(name='O', value=O.astype(theano.config.floatX)))
+        self.U = self.add_to_params(theano.shared(name='U', value=U.astype(theano.config.floatX)))
+        self.W = self.add_to_params(theano.shared(name='W', value=W.astype(theano.config.floatX)))
+        self.b = self.add_to_params(theano.shared(name='b', value=b.astype(theano.config.floatX)))
+        # We store the Theano graph here
+        self.theano = {}
+        self.__theano_build__()
+            
+    def __theano_build__(self):
+        U, W, b = self.U, self.W, self.b
+        Ho, Eo, bo, O = self.Ho, self.Eo, self.bo, self.O
         
-    def forward(self, S):
-        d_0 = T.tanh(T.dot(self.D_0, S[len(S) - 1]) + self.b_0)
-        w_0 = np.zeros(self.vocab.shape[0])
-        D, updates = theano.scan(self.GRU_dec.forward_prop_step, sequences=X, outputs_info=[None, d_0])
-        
-        pre_activ = T.dot(D, self.W_out)
-        probs = SoftMax(T.dot(pre_activ, self.W_emb.T) + self.b_out)
+        def forward_prop_step(q_t, w_t_prev, d_t_prev):
+            
+            # Create the activation of the current word
+            omega = Ho.dot(d_t_prev) + Eo.dot(w_t_prev) + bo
+            w_t = T.nnet.softmax((O.T).dot(omega)) # Should return a vector of the length of the vocabulary with probs for each word
+            
+            # GRU Layer
+            z_t = T.nnet.hard_sigmoid(U[0].dot(w_t) + W[0].dot(d_t_prev) + b[0])
+            r_t = T.nnet.hard_sigmoid(U[1].dot(w_t) + W[1].dot(d_t_prev) + b[1])
+            c_t = T.tanh(U[2].dot(w_t) + W[2].dot(d_t_prev * r_t) + b[2])
+            d_t = (T.ones_like(z_t) - z_t) * c_t + z_t * d_t_prev
+
+            return w_t, d_t
+            
+    def forward(self, s, q_m):
+        h_0 = T.tanh(self.D0.dot(s) + self.b0) # Initialize the first recurrent activation with the session
+        w_0 = np.zeros(self.vocab.shape[1]) # The length of the vocab, with 0 probability for every word
+        D, W, updates = theano.scan(self.forward_prop_step, sequences=q_m, outputs_info=[w_0, h_0])
         
     def add_to_params(self, new_param):
         self.params.append(new_param)
