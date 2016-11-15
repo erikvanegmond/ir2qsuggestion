@@ -14,6 +14,7 @@ session_inactivity = 30
 
 
 def read_files(max_files=10):  # -> pd.DataFrame:
+    print "reading {} files".format(max_files)
     file_counter = 0
     df = pd.DataFrame()
     for fn in os.listdir(data_path):
@@ -26,6 +27,19 @@ def read_files(max_files=10):  # -> pd.DataFrame:
     return df
 
 
+def alphanumeric_preprocessor(text):
+    """
+    Removes non alphanumeric characters and converts to lowercase
+    :param text:
+    :return:
+    """
+    try:
+        return re.sub("[^a-z1-9]", " ", text.lower())
+    except:
+        # most likely nan, but if it fails just assume empty.
+        return ""
+
+
 def preprocess_data(df):
     """
     Preprocesses the data
@@ -33,7 +47,7 @@ def preprocess_data(df):
     :return:
     """
     # take alphanumeric characters and make lowercase
-    df.loc[:, 'Query'] = df['Query'].apply(lambda x: re.sub("[^a-zA-Z1-9]", " ", x).lower())
+    df.loc[:, 'Query'] = df['Query'].apply(alphanumeric_preprocessor)
     # TODO spell corrector
     return df
 
@@ -50,7 +64,7 @@ def sessions(df):
     for user in users:
         for s in get_sessions_from_user(user[1]):
             session_list.append(s)
-    # print(session_list)
+            # print(session_list)
 
 
 def session_generator(df):
@@ -86,18 +100,23 @@ def get_sessions_from_user(user):
 
 def __main__():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-n", "--nfiles", type=int,
+    parser.add_argument("-n", "--nfiles", type=int, default=2,
                         help="number of files to process")
     args = parser.parse_args()
+
     data = read_files(args.nfiles)
+
+    print "preprocessing..."
     data = preprocess_data(data)
     print(data.columns.values)
+    print "get sessions..."
     sessions(data)
     vectorizer = CountVectorizer(analyzer="word", \
                                  tokenizer=None, \
                                  preprocessor=None, \
                                  stop_words=None, \
                                  max_features=5000)
+    print "vectorizing..."
     print vectorizer.fit_transform(data["Query"].values)
     print data.head(10)
 
