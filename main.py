@@ -1,7 +1,10 @@
 import pandas as pd
 import os
+import argparse
+import re
+from sklearn.feature_extraction.text import CountVectorizer
 
-data_path = "../../AOL_search_data_leak_2006/"
+data_path = "../AOL-user-ct-collection/"
 
 '''
     Sessions end after 30 minutes of inactivity, same definition google uses
@@ -10,7 +13,7 @@ data_path = "../../AOL_search_data_leak_2006/"
 session_inactivity = 30
 
 
-def read_files(max_files=10): #-> pd.DataFrame:
+def read_files(max_files=10):  # -> pd.DataFrame:
     file_counter = 0
     df = pd.DataFrame()
     for fn in os.listdir(data_path):
@@ -23,7 +26,19 @@ def read_files(max_files=10): #-> pd.DataFrame:
     return df
 
 
-def users_from_data(df):# -> pd.core.groupby.DataFrameGroupBy:
+def preprocess_data(df):
+    """
+    Preprocesses the data
+    :param df:
+    :return:
+    """
+    # take alphanumeric characters and make lowercase
+    df.loc[:, 'Query'] = df['Query'].apply(lambda x: re.sub("[^a-zA-Z1-9]", " ", x).lower())
+    # TODO spell corrector
+    return df
+
+
+def users_from_data(df):
     return df.groupby('AnonID')
 
 
@@ -35,14 +50,14 @@ def sessions(df):
     for user in users:
         for s in get_sessions_from_user(user[1]):
             session_list.append(s)
-    print(session_list)
+    # print(session_list)
 
 
 def session_generator(df):
-    '''
+    """
     :param df: dataframe to retrieve sessions from
     :return: sessions in the dataframe one by one.
-    '''
+    """
     users = users_from_data(df)
     for user in users:
         for s in get_sessions_from_user(user[1]):
@@ -69,6 +84,22 @@ def get_sessions_from_user(user):
         yield session
 
 
-data = read_files(1)
-print(data.columns.values)
-sessions(data)
+def __main__():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-n", "--nfiles", type=int,
+                        help="number of files to process")
+    args = parser.parse_args()
+    data = read_files(args.nfiles)
+    data = preprocess_data(data)
+    print(data.columns.values)
+    sessions(data)
+    vectorizer = CountVectorizer(analyzer="word", \
+                                 tokenizer=None, \
+                                 preprocessor=None, \
+                                 stop_words=None, \
+                                 max_features=5000)
+    print vectorizer.fit_transform(data["Query"].values)
+    print data.head(10)
+
+
+__main__()
