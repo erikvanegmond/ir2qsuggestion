@@ -24,12 +24,12 @@ class Decoder():
         D0 = NormalInit(self.rng, (q_dim, s_dim))
         b0 = np.zeros((1,s_dim))
         Ho = NormalInit(self.rng, (o_dim, q_dim))
-        Eo = NormalInit(self.rng, (o_dim, vocab.shape[0]))
+        Eo = NormalInit(self.rng, (o_dim, vocab.shape[1]))
         bo = np.zeros((1,o_dim))
-        O = OrthogonalInit(self.rng, (vocab.shape[1], o_dim))
-        U = OrthogonalInit(self.rng, (3, vocab.shape[1], q_dim))
+        O = OrthogonalInit(self.rng, (o_dim, vocab.shape[1]))
+        U = OrthogonalInit(self.rng, (3, q_dim, vocab.shape[1]))
         W = OrthogonalInit(self.rng, (3, q_dim, q_dim))
-        b = np.zeros((3, out_dim))
+        b = np.zeros((3, q_dim))
         # Theano: Created shared variables
         self.D0 = self.add_to_params(theano.shared(name='D0', value=D0.astype(theano.config.floatX)))
         self.b0 = self.add_to_params(theano.shared(name='b0', value=b0.astype(theano.config.floatX)))
@@ -60,12 +60,7 @@ class Decoder():
             c_t = T.tanh(U[2].dot(w_t) + W[2].dot(d_t_prev * r_t) + b[2])
             d_t = (T.ones_like(z_t) - z_t) * c_t + z_t * d_t_prev
 
-            return w_t, d_t
-            
-    def forward(self, s, q_m):
-        h_0 = T.tanh(self.D0.dot(s) + self.b0) # Initialize the first recurrent activation with the session
-        w_0 = np.zeros(self.vocab.shape[1]) # The length of the vocab, with 0 probability for every word
-        D, W, updates = theano.scan(self.forward_prop_step, sequences=q_m, outputs_info=[w_0, h_0])
+            return [w_t, d_t]
         
     def add_to_params(self, new_param):
         self.params.append(new_param)

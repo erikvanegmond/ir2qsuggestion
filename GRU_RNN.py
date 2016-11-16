@@ -10,7 +10,7 @@ from utils import * # NormalInit, OrthogonalInit
 # This class can be used for any en- or decode step.
 class GRU():
     
-    def __init__(self, in_dim, out_dim, rng=None):
+    def __init__(self, in_dim, out_dim, rng=None, scope=''):
         # The parameters
         self.params = []
         self.in_dim = in_dim
@@ -25,9 +25,9 @@ class GRU():
         W = OrthogonalInit(self.rng, (3, out_dim, out_dim))
         b = np.zeros((3, out_dim))
         # Theano: Created shared variables
-        self.U = self.add_to_params(theano.shared(name='U', value=U.astype(theano.config.floatX)))
-        self.W = self.add_to_params(theano.shared(name='W', value=W.astype(theano.config.floatX)))
-        self.b = self.add_to_params(theano.shared(name='b', value=b.astype(theano.config.floatX)))
+        self.U = self.add_to_params(theano.shared(name=scope+'/U', value=U.astype(theano.config.floatX)))
+        self.W = self.add_to_params(theano.shared(name=scope+'/W', value=W.astype(theano.config.floatX)))
+        self.b = self.add_to_params(theano.shared(name=scope+'/b', value=b.astype(theano.config.floatX)))
         # We store the Theano graph here
         self.theano = {}
         self.__theano_build__()
@@ -43,7 +43,7 @@ class GRU():
             c_t = T.tanh(U[2].dot(x_t) + W[2].dot(s_t_prev * r_t) + b[2])
             s_t = (T.ones_like(z_t) - z_t) * c_t + z_t * s_t_prev
 
-            return s_t
+            return [s_t]
 
     def add_to_params(self, new_param):
         self.params.append(new_param)
