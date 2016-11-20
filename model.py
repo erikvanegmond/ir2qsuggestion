@@ -48,7 +48,7 @@ class Model():
         """
         def forward_step(x_data, s_0):
             # Encode all the queries in x
-            q_0 = T.zeros(query_encoder.out_dim, dtype=theano.config.floatX)
+            q_0 = np.zeros(query_encoder.out_dim).astype(theano.config.floatX)
             Q = query_encoder.forward(x_data, q_0)
             # Encode all the session with the given query encodings
             [S], updates = theano.scan(session_encoder.forward_prop_step, sequences=Q, truncate_gradient=bptt_truncate,
@@ -117,8 +117,8 @@ val_iter = 10
 
 for iteration in iterations:
     X = np.random.choice(X_data)
-    y = X[1:]
-    X = X[:-1]
+    y = X[1:].astype(theano.config.floatX)
+    X = X[:-1].astype(theano.config.floatX)
     model.sgd_step(X, y, 0.001, 0.9)
     if iteration % val_iter == 0:
         loss = model.calc_loss(X, y)

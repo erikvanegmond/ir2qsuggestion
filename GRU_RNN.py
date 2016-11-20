@@ -35,8 +35,8 @@ class GRU():
     def __theano_build__(self):
         U, W, b = self.U, self.W, self.b
         
-        x = T.ivector(self.scope+'x')
-        h_0 = T.ivector(self.scope+'h_0')
+        x = T.vector(self.scope+'x')
+        h_0 = T.vector(self.scope+'h_0')
         
         def forward_prop_step(x_t, h_t_prev):
             # GRU Layer 1
