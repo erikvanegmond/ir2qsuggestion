@@ -48,9 +48,8 @@ class Model():
         """
         def forward_step(x_data, s_0):
             # Encode all the queries in x
-            q_0 = T.zeros(query_encoder.out_dim)
-            [Q], updates = theano.scan(query_encoder.forward_prop_step, sequences=x_data, truncate_gradient=bptt_truncate, 
-                                     outputs_infor=[None, q_0])
+            q_0 = T.zeros(query_encoder.out_dim, dtype=theano.config.floatX)
+            Q = query_encoder.forward(x_data, q_0)
             # Encode all the session with the given query encodings
             [S], updates = theano.scan(session_encoder.forward_prop_step, sequences=Q, truncate_gradient=bptt_truncate,
                                      outputs_info=[None, s_0])       
@@ -86,3 +85,42 @@ class Model():
         self.sgd_step = theano.function([x, y, learning_rate, theano.In(decay, value=0.9)], [], 
                                          updates = [(params, np.subtract(params, learning_rate * dparams / T.sqrt(np.add(cache, 1e-6)))),
                                                     (self.cache, cache)])
+#%%
+vocabSize = 6000
+numSessions = 100
+queriesPerSession = 5
+queryLength = 4
+max_length = 10
+
+def generate_query(vocab):
+    queryLen = min(max(int(np.random.normal(queryLength, 2)), 1), max_length)
+    idx = np.random.choice(vocab, queryLen)
+    query = np.zeros((queryLen, len(vocab)))
+    query[np.arange(queryLen), idx] = 1
+    return query
+
+vocab = np.arange(vocabSize)
+sessions = []
+for s in np.arange(numSessions):
+    numQueries = int(np.random.normal(queriesPerSession, 2))
+    queries = [generate_query(vocab) for q in np.arange(numQueries)]
+    sessions.append(queries)
+    
+train_perc = int(0.8 * len(sessions))
+X_data = sessions[:train_perc]
+X_test = sessions[train_perc:]
+
+model = Model(vocab, 4, max_length)
+#%%
+iterations = 100
+val_iter = 10
+
+for iteration in iterations:
+    X = np.random.choice(X_data)
+    y = X[1:]
+    X = X[:-1]
+    model.sgd_step(X, y, 0.001, 0.9)
+    if iteration % val_iter == 0:
+        loss = model.calc_loss(X, y)
+        print "%d th training. Loss: %f" % (iteration, loss)
+        print "======================================================="

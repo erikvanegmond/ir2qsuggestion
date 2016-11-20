@@ -10,19 +10,19 @@ from utils import * # NormalInit, OrthogonalInit
 # This class can be used for any en- or decode step.
 class GRU():
     
-    def __init__(self, in_dim, out_dim, rng=None, scope=''):
+    def __init__(self, in_dim, out_dim, bptt_truncate=4, scope=''):
         # The parameters
         self.params = []
         self.in_dim = in_dim
         self.out_dim = out_dim
-        # Random number generator
-        self.rng = rng
-        if self.rng == None:
-            self.rng = np.random
-            self.rng.seed(1234)
+        self.bptt_truncate = bptt_truncate
+        self.scope = scope
+        
         # Initialize the network parameters
-        U = OrthogonalInit(self.rng, (3, in_dim, out_dim))
-        W = OrthogonalInit(self.rng, (3, out_dim, out_dim))
+        invSqr1 = np.sqrt(1./in_dim)
+        invSqr2 = np.sqrt(1./out_dim)
+        U = np.random.uniform(-invSqr1, invSqr1, (3, out_dim, in_dim))
+        W = np.random.uniform(-invSqr2, invSqr2, (3, out_dim, out_dim))
         b = np.zeros((3, out_dim))
         # Theano: Created shared variables
         self.U = self.add_to_params(theano.shared(name=scope+'/U', value=U.astype(theano.config.floatX)))
@@ -35,15 +35,22 @@ class GRU():
     def __theano_build__(self):
         U, W, b = self.U, self.W, self.b
         
-        def forward_prop_step(x_t, s_t_prev):
-            
+        x = T.ivector(self.scope+'x')
+        h_0 = T.ivector(self.scope+'h_0')
+        
+        def forward_prop_step(x_t, h_t_prev):
             # GRU Layer 1
-            z_t = T.nnet.hard_sigmoid(U[0].dot(x_t) + W[0].dot(s_t_prev) + b[0])
-            r_t = T.nnet.hard_sigmoid(U[1].dot(x_t) + W[1].dot(s_t_prev) + b[1])
-            c_t = T.tanh(U[2].dot(x_t) + W[2].dot(s_t_prev * r_t) + b[2])
-            s_t = (T.ones_like(z_t) - z_t) * c_t + z_t * s_t_prev
+            z_t = T.nnet.hard_sigmoid(U[0].dot(x_t) + W[0].dot(h_t_prev) + b[0])
+            r_t = T.nnet.hard_sigmoid(U[1].dot(x_t) + W[1].dot(h_t_prev) + b[1])
+            c_t = T.tanh(U[2].dot(x_t) + W[2].dot(h_t_prev * r_t) + b[2])
+            h_t = (T.ones_like(z_t) - z_t) * c_t + z_t * h_t_prev
+    
+            return [h_t.astype(theano.config.floatX)]
 
-            return [s_t]
+        H, updates = theano.scan(forward_prop_step, sequences=x, truncate_gradient=self.bptt_truncate,
+                                          outputs_info=[h_0])
+
+        self.forward = theano.function([x, h_0], H)
 
     def add_to_params(self, new_param):
         self.params.append(new_param)
