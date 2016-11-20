@@ -45,12 +45,12 @@ class Model():
         - x_data: contains one or more queries as sequences of one-hot-encoded words
         - s_0: is a vector describing the initial activation of the session encoder (zeros if there were no queries of the same session before this)
         """
-        def forward_step(x_data, s_0):
-            # Encode all the queries in x
-            Q = query_encoder.forward(x_data)
-            # Encode all the session with the given query encodings
-            S = session_encoder.forward(Q, s_0)      
-            # Decode the given session encodings
+        def forward_step(q, s_0):
+            # Encode the query q
+            Q = query_encoder.forward(q)
+            # Encode the session given the previous session ecoding and the newly encoded query
+            S = session_encoder.forward(Q[-1], s_0)      
+            # Decode the resulting session encoding
             W = decoder.forward(S[-1])
             
             return [W, S[-1]]

@@ -98,8 +98,7 @@ class Session_GRU():
         x = T.vector(self.scope+'/x')
         h_0 = T.vector(self.scope+'/h_0')
         
-        H, updates = theano.scan(forward_prop_step, sequences=x, truncate_gradient=self.bptt_truncate,
-                                          outputs_info=[h_0])
+        H = forward_prop_step(x, h_0)
 
         self.forward = theano.function([x, h_0], H)
 

@@ -29,15 +29,15 @@ class Decoder():
         W = np.random.uniform(-invSqr2, invSqr2, (3, q_dim, q_dim))
         b = np.zeros((3, q_dim))
         # Theano: Created shared variables
-        self.D0 = self.add_to_params(theano.shared(name='D0', value=D0.astype(theano.config.floatX)))
-        self.b0 = self.add_to_params(theano.shared(name='b0', value=b0.astype(theano.config.floatX)))
-        self.Ho = self.add_to_params(theano.shared(name='Ho', value=Ho.astype(theano.config.floatX)))
-        self.Eo = self.add_to_params(theano.shared(name='Eo', value=Eo.astype(theano.config.floatX)))
-        self.bo = self.add_to_params(theano.shared(name='bo', value=bo.astype(theano.config.floatX)))
-        self.O = self.add_to_params(theano.shared(name='O', value=O.astype(theano.config.floatX)))
-        self.U = self.add_to_params(theano.shared(name='U', value=U.astype(theano.config.floatX)))
-        self.W = self.add_to_params(theano.shared(name='W', value=W.astype(theano.config.floatX)))
-        self.b = self.add_to_params(theano.shared(name='b', value=b.astype(theano.config.floatX)))
+        self.D0 = self.add_to_params(theano.shared(name='decoder/D0', value=D0.astype(theano.config.floatX)))
+        self.b0 = self.add_to_params(theano.shared(name='decoder/b0', value=b0.astype(theano.config.floatX)))
+        self.Ho = self.add_to_params(theano.shared(name='decoder/Ho', value=Ho.astype(theano.config.floatX)))
+        self.Eo = self.add_to_params(theano.shared(name='decoder/Eo', value=Eo.astype(theano.config.floatX)))
+        self.bo = self.add_to_params(theano.shared(name='decoder/bo', value=bo.astype(theano.config.floatX)))
+        self.O = self.add_to_params(theano.shared(name='decoder/O', value=O.astype(theano.config.floatX)))
+        self.U = self.add_to_params(theano.shared(name='decoder/U', value=U.astype(theano.config.floatX)))
+        self.W = self.add_to_params(theano.shared(name='decoder/W', value=W.astype(theano.config.floatX)))
+        self.b = self.add_to_params(theano.shared(name='decoder/b', value=b.astype(theano.config.floatX)))
         # We store the Theano graph here
         self.theano = {}
         self.__theano_build__()
@@ -46,7 +46,7 @@ class Decoder():
         U, W, b = self.U, self.W, self.b
         Ho, Eo, bo, O = self.Ho, self.Eo, self.bo, self.O
         
-        def forward_prop_step(q_t, w_t_prev, d_t_prev):
+        def forward_prop_step(w_t_prev, d_t_prev):
             
             # Create the activation of the current word
             omega = Ho.dot(d_t_prev) + Eo.dot(w_t_prev) + bo
@@ -64,7 +64,7 @@ class Decoder():
 
         h_0 = T.tanh(self.D0.dot(s) + self.b0) # Initialize the first recurrent activation with the session
         w_0 = T.zeros(len(self.vocab)) # The length of the vocab, with 0 probability for every word
-        [W, H], updates = theano.scan(self.forward_prop_step, n_steps=self.max_length, truncate_gradient=self.bptt_truncate,
+        [W, H], updates = theano.scan(forward_prop_step, n_steps=self.max_length, truncate_gradient=self.bptt_truncate,
                                     outputs_info=[w_0, h_0])
         
         self.forward = theano.function([s], W)
