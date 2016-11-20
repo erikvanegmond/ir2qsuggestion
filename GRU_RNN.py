@@ -51,7 +51,7 @@ class Query_GRU():
         H, updates = theano.scan(forward_prop_step, sequences=x, truncate_gradient=self.bptt_truncate,
                                           outputs_info=[h_0])
 
-        self.forward = theano.function([x], H)
+        self.forward = theano.function(inputs=[x], outputs=H)
 
     def add_to_params(self, new_param):
         self.params.append(new_param)
@@ -100,7 +100,7 @@ class Session_GRU():
         
         H = forward_prop_step(x, h_0)
 
-        self.forward = theano.function([x, h_0], H)
+        self.forward = theano.function(inputs=[x, h_0], outputs=H)
 
     def add_to_params(self, new_param):
         self.params.append(new_param)

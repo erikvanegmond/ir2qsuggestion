@@ -19,15 +19,15 @@ class Decoder():
         invSqr1 = np.sqrt(1./len(vocab))
         invSqr2 = np.sqrt(1./q_dim)
         D0 = np.random.uniform(-invSqr2, invSqr2, (q_dim, s_dim))
-        b0 = np.zeros((1, s_dim))
+        b0 = np.zeros((s_dim, 1))
         invSqr3 = np.sqrt(1./o_dim)
         Ho = np.random.uniform(-invSqr3, invSqr3, (o_dim, q_dim))
         Eo = np.random.uniform(-invSqr3, invSqr3, (o_dim, len(vocab)))
-        bo = np.zeros((1,o_dim))
+        bo = np.zeros((o_dim, 1))
         O = np.random.uniform(-invSqr3, invSqr3, (o_dim, len(vocab)))
         U = np.random.uniform(-invSqr1, invSqr1, (3, q_dim, len(vocab)))
         W = np.random.uniform(-invSqr2, invSqr2, (3, q_dim, q_dim))
-        b = np.zeros((3, q_dim))
+        b = np.zeros((q_dim, 3))
         # Theano: Created shared variables
         self.D0 = self.add_to_params(theano.shared(name='decoder/D0', value=D0.astype(theano.config.floatX)))
         self.b0 = self.add_to_params(theano.shared(name='decoder/b0', value=b0.astype(theano.config.floatX)))
@@ -53,9 +53,9 @@ class Decoder():
             w_t = T.nnet.softmax((O.T).dot(omega)) # Should return a vector of the length of the vocabulary with probs for each word
             
             # GRU Layer
-            z_t = T.nnet.hard_sigmoid(U[0].dot(w_t) + W[0].dot(d_t_prev) + b[0])
-            r_t = T.nnet.hard_sigmoid(U[1].dot(w_t) + W[1].dot(d_t_prev) + b[1])
-            c_t = T.tanh(U[2].dot(w_t) + W[2].dot(d_t_prev * r_t) + b[2])
+            z_t = T.nnet.hard_sigmoid(U[0].dot(w_t) + W[0].dot(d_t_prev) + b[:,0])
+            r_t = T.nnet.hard_sigmoid(U[1].dot(w_t) + W[1].dot(d_t_prev) + b[:,1])
+            c_t = T.tanh(U[2].dot(w_t) + W[2].dot(d_t_prev * r_t) + b[:,2])
             d_t = (T.ones_like(z_t) - z_t) * c_t + z_t * d_t_prev
 
             return [w_t, d_t]
@@ -63,11 +63,11 @@ class Decoder():
         s = T.vector('decoder/s')
 
         h_0 = T.tanh(self.D0.dot(s) + self.b0) # Initialize the first recurrent activation with the session
-        w_0 = T.zeros(len(self.vocab)) # The length of the vocab, with 0 probability for every word
+        w_0 = T.zeros((len(self.vocab), 1)) # The length of the vocab, with 0 probability for every word
         [W, H], updates = theano.scan(forward_prop_step, n_steps=self.max_length, truncate_gradient=self.bptt_truncate,
-                                    outputs_info=[w_0, h_0])
+                                    outputs_info=[dict(initial=w_0), dict(initial=h_0)])
         
-        self.forward = theano.function([s], W)
+        self.forward = theano.function(inputs=[s], outputs=W)
         
     def add_to_params(self, new_param):
         self.params.append(new_param)
