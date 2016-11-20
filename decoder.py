@@ -5,21 +5,16 @@ import numpy as np
 import theano
 import theano.tensor as T
 
-from utils import *
-from GRU_RNN import GRU
-
 class Decoder():
     
-    def __init__(self, q_dim, s_dim, vocab, o_dim=300, rng=None):
+    def __init__(self, q_dim, s_dim, vocab, max_length, bptt_truncate=4, o_dim=300):
         self.params = []
         self.q_dim = q_dim
         self.o_dim = o_dim
         self.s_dim = s_dim
         self.vocab = vocab
-        # Random number generator
-        self.rng = rng
-        if self.rng == None:
-            self.rng = np.random.RandomState(1234)
+        self.max_length = max_length
+        self.bptt_truncate = bptt_truncate
         # Initialize the network parameters
         invSqr1 = np.sqrt(1./len(vocab))
         invSqr2 = np.sqrt(1./q_dim)
@@ -64,6 +59,15 @@ class Decoder():
             d_t = (T.ones_like(z_t) - z_t) * c_t + z_t * d_t_prev
 
             return [w_t, d_t]
+
+        s = T.vector('decoder/s')
+
+        h_0 = T.tanh(self.D0.dot(s) + self.b0) # Initialize the first recurrent activation with the session
+        w_0 = T.zeros(len(self.vocab)) # The length of the vocab, with 0 probability for every word
+        [W, H], updates = theano.scan(self.forward_prop_step, n_steps=self.max_length, truncate_gradient=self.bptt_truncate,
+                                    outputs_info=[w_0, h_0])
+        
+        self.forward = theano.function([s], W)
         
     def add_to_params(self, new_param):
         self.params.append(new_param)

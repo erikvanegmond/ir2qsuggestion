@@ -5,7 +5,7 @@ import numpy as np
 import theano
 import theano.tensor as T
 
-from GRU_RNN import GRU
+from GRU_RNN import Query_GRU, Session_GRU
 from decoder import Decoder
 
 class Model():
@@ -19,24 +19,23 @@ class Model():
         """
         You can see this as the Encoder class without the session weights (Ws)
         """
-        self.query_encoder = GRU(len(vocab), 1000, self.rng, 'query')
+        self.query_encoder = Query_GRU(len(vocab), 1000, scope='query')
         # Create session encoder
         """
         You can see this as the Encoder class without the query weights (W)
         """
-        self.session_encoder = GRU(1000, 1500, self.rng, 'session')
+        self.session_encoder = Session_GRU(1000, 1500, scope='session')
         # Create decoder
         """
         This is the same as the Decoder class
         """
-        self.decoder = Decoder(1000, 1500, vocab, rng=self.rng)
+        self.decoder = Decoder(1000, 1500, vocab, max_length)
         
         self.theano = {}
         self.__theano_build__()
         
     def __theano_build__(self):
         query_encoder, session_encoder, decoder = self.query_encoder, self.session_encoder, self.decoder
-        bptt_truncate, max_length = self.bptt_truncate, self.max_length
         
         x = T.ivector('x')
         y = T.ivector('y')
@@ -48,22 +47,17 @@ class Model():
         """
         def forward_step(x_data, s_0):
             # Encode all the queries in x
-            q_0 = np.zeros(query_encoder.out_dim).astype(theano.config.floatX)
-            Q = query_encoder.forward(x_data, q_0)
+            Q = query_encoder.forward(x_data)
             # Encode all the session with the given query encodings
-            [S], updates = theano.scan(session_encoder.forward_prop_step, sequences=Q, truncate_gradient=bptt_truncate,
-                                     outputs_info=[None, s_0])       
+            S = session_encoder.forward(Q, s_0)      
             # Decode the given session encodings
-            h_0 = T.tanh(decoder.D0.dot(S[-1]) + decoder.b0) # Initialize the first recurrent activation with the session
-            w_0 = T.zeros(len(decoder.vocab)) # The length of the vocab, with 0 probability for every word
-            [W, H], updates = theano.scan(decoder.forward_prop_step, n_steps=max_length, truncate_gradient=bptt_truncate,
-                                        outputs_info=[None, w_0, h_0])
+            W = decoder.forward(S[-1])
             
-            return [W, S]
+            return [W, S[-1]]
         
         # This can only be done for one session
         s_0 = T.zeros(session_encoder.out_dim)
-        [W, S], updates = theano.scan(forward_step, sequences=x, truncate_gradient=bptt_truncate,
+        [W, s], updates = theano.scan(forward_step, sequences=x, truncate_gradient=self.bptt_truncate,
                                           outputs_info=[None, s_0])
         prediction = T.argmax(W, axis=1)
         loss = T.sum(T.nnet.categorical_crossentropy(W, y))
@@ -94,9 +88,9 @@ max_length = 10
 
 def generate_query(vocab):
     queryLen = min(max(int(np.random.normal(queryLength, 2)), 1), max_length)
-    idx = np.random.choice(vocab, queryLen)
-    query = np.zeros((queryLen, len(vocab)))
-    query[np.arange(queryLen), idx] = 1
+    query = np.append(np.random.choice(vocab, queryLen), np.zeros(max_length - queryLen).astype(int))
+    #query = np.zeros((len(vocab), max_length))
+    #query[idx, np.arange(max_length)] = 1
     return query
 
 vocab = np.arange(vocabSize)
@@ -117,8 +111,8 @@ val_iter = 10
 
 for iteration in iterations:
     X = np.random.choice(X_data)
-    y = X[1:].astype(theano.config.floatX)
-    X = X[:-1].astype(theano.config.floatX)
+    y = X[1:]
+    X = X[:-1]
     model.sgd_step(X, y, 0.001, 0.9)
     if iteration % val_iter == 0:
         loss = model.calc_loss(X, y)
