@@ -92,6 +92,12 @@ def lambdaMart(data):
 #we have options that could be the target query
 #we need to have the 20 most cooccurent
 def ADJ_function(anchor_query, sessions):
+    '''
+    :param anchor_query: the query for which we calculate the queries that are commonly entered after. eg: 'this is a query'
+    :param sessions: list of lists of queries. eg: [['this q1 in s1', 'this is q1 in s1'], ['this is q1 in s2', 'this is q2 in s2'], ...]
+    :return: list of the 20 best queries
+    :return: sugg_features the fequencies of these frequencies in respect to the anchor query.
+    '''
     cooccurence_list = []
     for sess in sessions:
         sess = sess.values
