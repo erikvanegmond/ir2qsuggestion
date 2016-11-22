@@ -23,6 +23,18 @@ import operator
 # import main
 import random
 
+def read_files(max_files=10):  # -> pd.DataFrame:
+    print "reading {} files".format(max_files)
+    file_counter = 0
+    df = pd.DataFrame()
+    for fn in os.listdir(data_path):
+        file_path = data_path + fn
+        if os.path.isfile(file_path) and fn.startswith('user-ct-test-collection') and file_counter < max_files:
+            print("loading {}...".format(file_path))
+            df = pd.concat(
+                [df, pd.read_csv(file_path, sep="\t", parse_dates=[2], infer_datetime_format=True, usecols=[0, 1, 2])])
+            file_counter += 1
+    return df
 
 
 def lambdaMart(data):
@@ -34,25 +46,6 @@ def lambdaMart(data):
     # 20% validation
     # 25% test
     training_queries, validation_queries, test_queries = np.split(data.sample(frac=1), [int(.55 * len(data)), int(.75 * len(data))])
-
-    logging.info('================================================================================')
-
-    # Save them to binary format ...
-    training_queries.save('data/MQ2007/Fold1/training')
-    validation_queries.save('data/MQ2007/Fold1/validation')
-    test_queries.save('data/MQ2007/Fold1/test')
-
-    # ... because loading them will be faster.
-    training_queries = Queries.load('data/MQ2007/Fold1/training')
-    validation_queries = Queries.load('data/MQ2007/Fold1/validation')
-    test_queries = Queries.load('data/MQ2007/Fold1/test')
-
-    logging.info('================================================================================')
-
-    # Print basic info about query datasets.
-    logging.info('Train queries: %s' % training_queries)
-    logging.info('Valid queries: %s' % validation_queries)
-    logging.info('Test queries: %s' %test_queries)
 
     logging.info('================================================================================')
 
@@ -116,27 +109,8 @@ def ADJ_function(anchor_query, sessions):
     # should be 20, when not in test fase
     best_20 = map(operator.itemgetter(0), sorted_ADJ_results)[:len(sorted_ADJ_results)]
     sugg_features = map(operator.itemgetter(1), sorted_ADJ_results)[:len(sorted_ADJ_results)]
-    print("sugg_features" + sugg_features)
+    print("sugg_features" + str(sugg_features))
     return best_20, sugg_features
-
-
-# df = main.read_files(10)
-
-def read_files(max_files=10):  # -> pd.DataFrame:
-    print "reading {} files".format(max_files)
-    file_counter = 0
-    df = pd.DataFrame()
-    for fn in os.listdir(data_path):
-        file_path = data_path + fn
-        if os.path.isfile(file_path) and fn.startswith('user-ct-test-collection') and file_counter < max_files:
-            print("loading {}...".format(file_path))
-            df = pd.concat(
-                [df, pd.read_csv(file_path, sep="\t", parse_dates=[2], infer_datetime_format=True, usecols=[0, 1, 2])])
-            file_counter += 1
-    return df
-
-
-
 
 # Do LambdaMart for 3 different scenario's
 # 1 Next-QueryPrediction (when anchor query exists in background data)
@@ -145,7 +119,7 @@ def read_files(max_files=10):  # -> pd.DataFrame:
 # instances,~ = data.shape
 # one_hot_session_vector = np.zeros(instances)
 
-def next_query_prediction(sessions):
+def next_query_prediction(anchor_query, sessions):
     lambdamart_data = []
     corresponding_queries = []
     for i,session in enumerate(sessions):
