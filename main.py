@@ -1,7 +1,6 @@
 import pandas as pd
 import os
 import argparse
-import re
 from sklearn.feature_extraction.text import CountVectorizer
 
 data_path = "../sessionized-data/"
@@ -24,30 +23,25 @@ def read_files(max_files=10):  # -> pd.DataFrame:
             df = pd.concat(
                 [df, pd.read_csv(file_path, sep=",", parse_dates=[2], infer_datetime_format=True)])
             file_counter += 1
+    sessions = df.groupby(['AnonID', 'session_label'])
+    for s in sessions:
+        print s[1]
     return df
 
 
 def __main__():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-n", "--nfiles", type=int, default=2,
+    parser.add_argument("-n", "--nfiles", type=int, default=1,
                         help="number of files to process")
     args = parser.parse_args()
 
     data = read_files(args.nfiles)
-
-    print "preprocessing..."
-    data = preprocess_data(data)
-    print(data.columns.values)
-    print "get sessions..."
-    sessions(data)
-    vectorizer = CountVectorizer(analyzer="word", \
-                                 tokenizer=None, \
-                                 preprocessor=None, \
-                                 stop_words=None, \
-                                 max_features=5000)
-    print "vectorizing..."
-    print vectorizer.fit_transform(data["Query"].values)
-    print data.head(10)
-
+    # vectorizer = CountVectorizer(analyzer="word", \
+    #                              tokenizer=None, \
+    #                              preprocessor=None, \
+    #                              stop_words=None, \
+    #                              max_features=5000)
+    # print "vectorizing..."
+    # print vectorizer.fit_transform(data["Query"].values)
 
 __main__()

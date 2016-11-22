@@ -30,7 +30,7 @@ def read_files(max_files=10):  # -> pd.DataFrame:
             print("loading {}...".format(file_path))
             df = pd.read_csv(file_path, sep=",", parse_dates=[2], infer_datetime_format=True)
             print("preprocessing {}...".format(file_path))
-            sessions(df)
+            df = sessions(df)
             save_df(output_data_path, df, fn)
             file_counter += 1
 

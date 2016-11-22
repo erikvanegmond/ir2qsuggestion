@@ -1,8 +1,11 @@
+from collections import Counter
+
 import pandas as pd
 import os
 import argparse
 import re
 from utils import save_df
+import pickle as pkl
 '''
 How to use this script:
 1. Set the data path and the output datapath for your system. The output directory does not have to exist yet.
@@ -12,6 +15,7 @@ How to use this script:
 data_path = "../AOL-user-ct-collection/"
 output_data_path = "../preprocessed-data/"
 
+word_counter = Counter()
 
 def preprocess_files(max_files=10):
     print "reading {} files".format(max_files)
@@ -30,12 +34,14 @@ def preprocess_files(max_files=10):
 
 def alphanumeric_preprocessor(text):
     """
-    Removes non alphanumeric characters and converts to lowercase
+    Removes non alphanumeric characters and converts to lowercase and updates the word counter
     :param text:
     :return:
     """
     try:
-        return re.sub("\s\s+", " ", re.sub("[^a-z1-9]", " ", text.lower()))
+        s = re.sub("\s\s+", " ", re.sub("[^a-z1-9]", " ", text.lower()))
+        word_counter.update(s.split())
+        return s
     except:
         # most likely nan, but if it fails just assume empty.
         return ""
