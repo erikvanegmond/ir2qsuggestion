@@ -125,15 +125,18 @@ def next_query_prediction(anchor_query, sessions):
     for i,session in enumerate(sessions):
         # get anchor query and target query from session
         anchor_query = session.iloc[-2]
-        # Done for testing, will be the result from the RNN
         target_query = session.iloc[-1]
         # extract 20 queries with the highest ADJ score (most likely to follow the anchor query in the data)
         highest_ADJ_queries, sugg_features = ADJ_function(anchor_query, sessions)
 
         # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
+        print("target query" +  str(target_query))
+        print("highest ADJ queries" + str(highest_ADJ_queries))
         if target_query in highest_ADJ_queries:
+            print("it is in here")
             target_vector = -1 * np.ones(len(highest_ADJ_queries))
-            target_query_index = np.where(highest_ADJ_queries == target_query)[0]
+            target_query_index = np.where(highest_ADJ_queries == target_query)
+            print(target_query_index)
             target_vector[target_query_index] = 1
             # print(target_vector)
             # then add the session to the train, val, test data
