@@ -141,7 +141,7 @@ class Model():
                                     outputs_info=[w_0, h_0])
         
         prediction = T.argmax(W, axis=1)
-        loss = T.sum(T.nnet.categorical_crossentropy(prediction, y))
+        loss = T.sum(T.nnet.categorical_crossentropy(W, y))
         
         dparams = T.grad(loss, self.params)
         
@@ -196,6 +196,11 @@ val_iter = 10
 for iteration in iterations:
     X = np.random.choice(X_data)
     y = X[1:]
+    one_hot_y = []
+    for i in y:
+        one_hot = np.zeros((len(vocab), len(i)))
+        one_hot[y, np.arange(len(i))] = 1
+        one_hot_y.append(one_hot)
     X = X[:-1]
     model.sgd_step(X, y, 0.001, 0.9)
     if iteration % val_iter == 0:
