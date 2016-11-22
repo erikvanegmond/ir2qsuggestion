@@ -19,7 +19,7 @@ class Decoder():
         invSqr1 = np.sqrt(1./len(vocab))
         invSqr2 = np.sqrt(1./q_dim)
         D0 = np.random.uniform(-invSqr2, invSqr2, (q_dim, s_dim))
-        b0 = np.zeros((s_dim, 1))
+        b0 = np.zeros((q_dim, 1))
         invSqr3 = np.sqrt(1./o_dim)
         Ho = np.random.uniform(-invSqr3, invSqr3, (o_dim, q_dim))
         Eo = np.random.uniform(-invSqr3, invSqr3, (o_dim, len(vocab)))
@@ -51,6 +51,7 @@ class Decoder():
             # Create the activation of the current word
             omega = Ho.dot(d_t_prev) + Eo.dot(w_t_prev) + bo
             w_t = T.nnet.softmax((O.T).dot(omega)) # Should return a vector of the length of the vocabulary with probs for each word
+            print w_t.shape.eval()
             
             # GRU Layer
             z_t = T.nnet.hard_sigmoid(U[0].dot(w_t) + W[0].dot(d_t_prev) + b[:,0])
@@ -63,7 +64,7 @@ class Decoder():
         s = T.vector('decoder/s')
 
         h_0 = T.tanh(self.D0.dot(s) + self.b0) # Initialize the first recurrent activation with the session
-        w_0 = T.zeros((len(self.vocab), 1)) # The length of the vocab, with 0 probability for every word
+        w_0 = np.zeros((len(self.vocab), 1)).astype(theano.config.floatX) # The length of the vocab, with 0 probability for every word
         [W, H], updates = theano.scan(forward_prop_step, n_steps=self.max_length, truncate_gradient=self.bptt_truncate,
                                     outputs_info=[dict(initial=w_0), dict(initial=h_0)])
         

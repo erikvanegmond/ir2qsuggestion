@@ -8,7 +8,7 @@ import theano.tensor as T
 # This class can be used for any en- or decode step.
 class Query_GRU():
     
-    def __init__(self, in_dim, out_dim, bptt_truncate=4, scope=''):
+    def __init__(self, in_dim, out_dim, emb_dim=300, bptt_truncate=4, scope=''):
         # The parameters
         self.params = []
         self.in_dim = in_dim
@@ -18,10 +18,11 @@ class Query_GRU():
         
         # Initialize the network parameters
         invSqr1 = np.sqrt(1./in_dim)
-        invSqr2 = np.sqrt(1./out_dim)
-        E = np.random.uniform(-invSqr1, invSqr1, (out_dim, in_dim))
-        U = np.random.uniform(-invSqr1, invSqr1, (3, out_dim, out_dim))
-        W = np.random.uniform(-invSqr2, invSqr2, (3, out_dim, out_dim))
+        invSqr2 = np.sqrt(1./emb_dim)
+        invSqr3 = np.sqrt(1./out_dim)
+        E = np.random.uniform(-invSqr1, invSqr1, (emb_dim, in_dim))
+        U = np.random.uniform(-invSqr2, invSqr2, (3, out_dim, emb_dim))
+        W = np.random.uniform(-invSqr3, invSqr3, (3, out_dim, out_dim))
         b = np.zeros((3, out_dim))
         # Theano: Created shared variables
         self.E = self.add_to_params(theano.shared(name=scope+'/E', value=E.astype(theano.config.floatX)))
@@ -51,7 +52,7 @@ class Query_GRU():
         H, updates = theano.scan(forward_prop_step, sequences=x, truncate_gradient=self.bptt_truncate,
                                           outputs_info=[h_0])
 
-        self.forward = theano.function(inputs=[x], outputs=H)
+        self.forward = theano.function([x], H)
 
     def add_to_params(self, new_param):
         self.params.append(new_param)
