@@ -5,24 +5,26 @@ How to use this script:
 '''
 
 
-class Sessionizer():
-    def __init__(self):
-        pass
+class Sessionizer(object):
 
-    data_path = "../data/tr_session.ctx"
+    def __init__(self, data_path="../data/tr_session"):
+        '''
+        NOTE: the data path has no extention
+        :param data_path:
+        '''
+        self.data_path = data_path
 
     def get_sessions(self):
         sessions = []
-        with open(self.data_path) as f:
+        with open(self.data_path+".ctx") as f:
             for line in f:
                 sessions.append(line.rstrip('\n').split('\t'))
         return sessions
 
-
-def __main__():
-    sessionizer = Sessionizer()
-    sessionizer.get_sessions()
-    print 'got sessions'
-
-
-__main__()
+    def get_sessions_with_numbers(self):
+        sessions = []
+        with open(self.data_path+".out") as f:
+            for line in f:
+                numbers_list = [map(int, x.split()) for x in line.rstrip('\n').split('\t')]
+                sessions.append(numbers_list)
+        return sessions
