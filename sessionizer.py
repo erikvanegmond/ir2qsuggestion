@@ -1,10 +1,3 @@
-import pandas as pd
-import os
-import argparse
-import re
-from utils import save_df
-from sklearn.feature_extraction.text import CountVectorizer
-
 '''
 How to use this script:
 1. Set the data path to the path where your preprocessed files are.
@@ -26,15 +19,8 @@ class Sessionizer():
         return sessions
 
 
-
-
-
-
-
 def __main__():
     sessionizer = Sessionizer()
-    parser = argparse.ArgumentParser()
-    args = parser.parse_args()
     sessionizer.get_sessions()
     print 'got sessions'
 
