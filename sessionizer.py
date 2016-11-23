@@ -5,11 +5,10 @@ How to use this script:
 '''
 
 
-class Sessionizer():
-    def __init__(self):
-        pass
+class Sessionizer(object):
 
-    data_path = "../data/tr_session.ctx"
+    def __init__(self, data_path="../data/tr_session.ctx"):
+        self.data_path = data_path
 
     def get_sessions(self):
         sessions = []
@@ -17,12 +16,3 @@ class Sessionizer():
             for line in f:
                 sessions.append(line.rstrip('\n').split('\t'))
         return sessions
-
-
-def __main__():
-    sessionizer = Sessionizer()
-    sessionizer.get_sessions()
-    print 'got sessions'
-
-
-__main__()
