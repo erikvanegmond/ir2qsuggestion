@@ -4,6 +4,8 @@
 import numpy
 import theano
 import theano.tensor as T
+import os
+
 
 def NormalInit(rng, sizeX, sizeY, scale=0.01, sparsity=-1):
     """ 
@@ -11,19 +13,20 @@ def NormalInit(rng, sizeX, sizeY, scale=0.01, sparsity=-1):
     """
     sizeX = int(sizeX)
     sizeY = int(sizeY)
-    
+
     if sparsity < 0:
         sparsity = sizeY
-     
+
     sparsity = numpy.minimum(sizeY, sparsity)
     values = numpy.zeros((sizeX, sizeY), dtype=theano.config.floatX)
     for dx in xrange(sizeX):
         perm = rng.permutation(sizeY)
         new_vals = rng.normal(loc=0, scale=scale, size=(sparsity,))
         values[dx, perm[:sparsity]] = new_vals
-        
+
     return values.astype(theano.config.floatX)
-    
+
+
 def OrthogonalInit(rng, shape):
     if len(shape) != 2:
         raise ValueError
@@ -48,7 +51,8 @@ def OrthogonalInit(rng, shape):
 
     n_min = min(shape[0], shape[1])
     return numpy.dot(Q1[:, :n_min], Q2[:n_min, :])
-    
+
+
 def GrabProbs(class_probs, target, gRange=None):
     if class_probs.ndim > 2:
         class_probs = class_probs.reshape((class_probs.shape[0] * class_probs.shape[1], class_probs.shape[2]))
@@ -58,12 +62,21 @@ def GrabProbs(class_probs, target, gRange=None):
         tflat = target.flatten()
     else:
         tflat = target
-     
+
     # return grabber(class_probs, target).flatten()
     ### Hack for Theano, much faster than [x, y] indexing 
     ### avoids a copy onto the GPU
     return T.diag(class_probs.T[tflat])
-    
+
+
 def SoftMax(x):
-    x = T.exp(x - T.max(x, axis=x.ndim-1, keepdims=True))
-    return x / T.sum(x, axis=x.ndim-1, keepdims=True)
+    x = T.exp(x - T.max(x, axis=x.ndim - 1, keepdims=True))
+    return x / T.sum(x, axis=x.ndim - 1, keepdims=True)
+
+
+def save_df(output_dat_path, df, fn):
+    file_path = output_dat_path + fn
+    if not os.path.exists(output_dat_path):
+        os.makedirs(output_dat_path)
+    df.to_csv(file_path, index=False)
+    print "{} saved".format(file_path)
