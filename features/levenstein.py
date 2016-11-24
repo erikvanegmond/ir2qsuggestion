@@ -1,15 +1,15 @@
 from nltk.metrics.distance import edit_distance
-
 from features.feature import Feature
 
 
 class Levenshtein(Feature):
 
-    def calculate_feature(self, anchor_query, queries):
+    @staticmethod
+    def calculate_feature(compared_query, queries):
         features = []
         for q in queries:
-            features.append(self.lev_dist(anchor_query, q))
-            Feature.cooccurrences[anchor_query]['levenshtein'] = features
+            features.append(Levenshtein.lev_dist(compared_query, q))
+        Feature.cooccurrences[compared_query]['levenshtein'] = features
         return features
 
     @staticmethod

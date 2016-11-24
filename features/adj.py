@@ -7,12 +7,13 @@ import numpy as np
 
 
 class ADJ(Ranker):
-    def adj_function(self, anchor_query):
+    @staticmethod
+    def adj_function(anchor_query):
         if anchor_query in ADJ.cooccurrences:
             return ADJ.cooccurrences[anchor_query]
 
         cooccurrence_list = Counter()
-        for session in self.sessions:
+        for session in ADJ.sessions:
             if anchor_query in session:
                 anchor_occurrence = [i for i, x in enumerate(session) if anchor_query == x]
                 for i in anchor_occurrence:
@@ -26,6 +27,6 @@ class ADJ(Ranker):
         top20_relfreq = [y / float(tot) for x, y in top20]
         top20_absfreq = [y for x, y in top20]
 
-        ADJ.cooccurrences[anchor_query] = {'adj_queries': top20_queries, 'absfreq': top20_absfreq,
-                                           'relfreq': top20_relfreq}
+        ADJ.cooccurrences[anchor_query].update({'adj_queries': top20_queries, 'absfreq': top20_absfreq,
+                                                'relfreq': top20_relfreq})
         return ADJ.cooccurrences[anchor_query]
