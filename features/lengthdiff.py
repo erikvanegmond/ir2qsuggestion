@@ -5,7 +5,6 @@ class LengthDiff(Feature):
 
     @staticmethod
     def calculate_feature(compared_query, queries):
-        print "cal len"
         features = []
         cql = len(compared_query)
         for q in queries:
