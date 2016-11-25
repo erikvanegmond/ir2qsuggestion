@@ -1,120 +1,122 @@
-"""
-@author: Jaimy
-"""
 import numpy as np
-import theano
+import theano as theano
 import theano.tensor as T
+from theano.gradient import grad_clip
+import time
+import layers
+import pickle
 
-from GRU_RNN import Query_GRU, Session_GRU
-from decoder import Decoder
+#from data import word2index
+word2index = pickle.load( open( "../data/word2index.p", "rb" ) )
 
-class Model():
+class Model:
     
-    def __init__(self, vocab, bptt_truncate, max_length):
-        # Random number generator
-        self.rng = np.random.RandomState(1234)
-        self.bptt_truncate = bptt_truncate
-        self.max_length = max_length
-        # Create a query encoder
-        """
-        You can see this as the Encoder class without the session weights (Ws)
-        """
-        self.query_encoder = Query_GRU(len(vocab), 1000, scope='query')
-        # Create session encoder
-        """
-        You can see this as the Encoder class without the query weights (W)
-        """
-        self.session_encoder = Session_GRU(1000, 1500, scope='session')
-        # Create decoder
-        """
-        This is the same as the Decoder class
-        """
-        self.decoder = Decoder(1000, 1500, vocab, max_length)
-        
+    def __init__(self, inputSize, hiddenSize, outputSize, query_len = 40, modules = None):
+
+        self.inputSize = inputSize
+        self.hiddenSize = hiddenSize
+        self.outputSize = outputSize
+        self.query_len = query_len
+        if modules == None:
+            encoder = layers.GRU(inputSize, hiddenSize, "encoder-GRU")
+            decoder = layers.GRU(outputSize, hiddenSize, "decoder-GRU")
+            ffout = layers.FF(hiddenSize, inputSize, "ffout")
+            self.modules = { "encoder" : encoder, "decoder" : decoder, "ffout" : ffout }
+        else:
+            self.modules = modules 
         self.theano = {}
         self.__theano_build__()
-        
+
     def __theano_build__(self):
-        query_encoder, session_encoder, decoder = self.query_encoder, self.session_encoder, self.decoder
-        
-        x = T.ivector('x')
-        y = T.ivector('y')
-        
-        """
-        This method passes the data through the whole process to generate a new query.
-        - x_data: contains one or more queries as sequences of one-hot-encoded words
-        - s_0: is a vector describing the initial activation of the session encoder (zeros if there were no queries of the same session before this)
-        """
-        def forward_step(q, s_0):
-            # Encode the query q
-            Q = query_encoder.forward(q)
-            # Encode the session given the previous session ecoding and the newly encoded query
-            S = session_encoder.forward(Q[-1], s_0)      
-            # Decode the resulting session encoding
-            W = decoder.forward(S[-1])
-            
-            return [W, S[-1]]
-        
-        # This can only be done for one session
-        s_0 = T.zeros(session_encoder.out_dim)
-        [W, s], updates = theano.scan(forward_step, sequences=x, truncate_gradient=self.bptt_truncate,
-                                          outputs_info=[None, s_0])
-        prediction = T.argmax(W, axis=1)
-        loss = T.sum(T.nnet.categorical_crossentropy(W, y))
-        
-        params = query_encoder.params + session_encoder.params + decoder.params
-        dparams = T.grad(loss, params)
-        
-        self.predict = theano.function([x], W)
-        self.predict_query = theano.function([x], prediction)
-        self.cross_error = theano.function([x, y], loss)
-        self.bptt = theano.function([x, y], dparams)
-        
-        learning_rate = T.scalar('learning_rate')
-        decay = T.scalar('decay')
 
-        temp = 1 - decay
-        cache = decay * self.cache + temp * np.power(dparams, 2)
+        encoder, decoder, ffout = self.modules["encoder"], self.modules["decoder"], self.modules["ffout"]
+
+        x_e = T.ivector('x_e')
+        y = T.ivector("y")
+
+        y_d = y#[1:]
+        y_x = y#[:-1]
+
+        #encoder loop
+        s_e, updates = theano.scan(
+            encoder.step,
+            sequences = x_e,
+            outputs_info = T.zeros(self.hiddenSize))
+
+        vector_rep = s_e[-1]
+
+        def decoder_out(y_x, prev):
+            s = decoder.step(y_x, prev)
+            o_t = ffout.step(s)
+            return o_t, s
+
+        [o_d, s_d], updates = theano.scan(
+            decoder_out,
+            sequences=y_x,
+            outputs_info=[None, dict(initial=vector_rep)])
+
+        def decoder_out_free(y_x, prev):
+            s = decoder.step(y_x, prev)
+            o_t = ffout.step(s)
+
+            return (T.argmax(o_t), s), theano.scan_module.until(T.eq(T.argmax(o_t), T.constant(word2index["</q>"])))
+
+        [o_d_free, s_d_free], updates = theano.scan(
+            decoder_out_free,
+            outputs_info=[dict(initial=T.cast(T.constant(word2index["</s>"]), "int64")), dict(initial=vector_rep)],
+            n_steps = self.query_len)
+
+        cost = T.sum(T.nnet.categorical_crossentropy(o_d, y_d))
+
+        self.predict_class = theano.function([x_e], o_d_free)
+        self.vector_rep = theano.function([x_e], vector_rep)
+        self.ce_error = theano.function([x_e, y], cost)
+
+
+        lr = T.scalar('learning rate')
+
+        updates = ffout.getUpdates(cost, lr) + decoder.getUpdates(cost, lr) + encoder.getUpdates(cost, lr)
+
+        self.SGD = theano.function(
+            [x_e, y, lr],
+            updates = updates)
+
+    def calculate_total_loss(self, test_x, test_y):
+        return np.sum([self.ce_error(x_e, y) for x_e, y in zip(test_x, test_y)])
+
+    def calculate_loss(self, test_x, test_y):
+        num_words = np.sum([len(y) for y in test_y])
+        return self.calculate_total_loss(test_x, test_y)/float(num_words)
+
+    @staticmethod
+    def save(model, filestr):
         
-        self.sgd_step = theano.function([x, y, learning_rate, theano.In(decay, value=0.9)], [], 
-                                         updates = [(params, np.subtract(params, learning_rate * dparams / T.sqrt(np.add(cache, 1e-6)))),
-                                                    (self.cache, cache)])
-#%%
-vocabSize = 6000
-numSessions = 100
-queriesPerSession = 5
-queryLength = 4
-max_length = 10
+        filestr += '-' + str(model.inputSize) + 'x' + str(model.hiddenSize) + 'x' + str(model.outputSize) + '.p'
+        print("[Saving model to %s...]" % filestr)
+        
+        #pickle.dump(model, open(filestr, 'wb'))
+        modules = {name: model.modules[name].getParameters() for name in model.modules}
+        sizes = [model.inputSize, model.hiddenSize, model.outputSize]
 
-def generate_query(vocab):
-    queryLen = min(max(int(np.random.normal(queryLength, 2)), 1), max_length)
-    query = np.append(np.random.choice(vocab, queryLen), np.zeros(max_length - queryLen).astype(int))
-    #query = np.zeros((len(vocab), max_length))
-    #query[idx, np.arange(max_length)] = 1
-    return query
+        np.savez(filestr, sizes = sizes, **modules)
 
-vocab = np.arange(vocabSize)
-sessions = []
-for s in np.arange(numSessions):
-    numQueries = int(np.random.normal(queriesPerSession, 2))
-    queries = [generate_query(vocab) for q in np.arange(numQueries)]
-    sessions.append(queries)
-    
-train_perc = int(0.8 * len(sessions))
-X_data = sessions[:train_perc]
-X_test = sessions[train_perc:]
+    @staticmethod
+    def load(filestr):
+        print("[Loading model from %s...]" % filestr)
+        f = np.load(filestr)
+        module_values = {name: f[name] for name in f.files}
+        sizes = module_values.pop("sizes")
 
-model = Model(vocab, 4, max_length)
-#%%
-iterations = 100
-val_iter = 10
+        #reconstructing modules
 
-for iteration in iterations:
-    X = np.random.choice(X_data)
-    y = X[1:]
-    X = X[:-1]
-    model.sgd_step(X, y, 0.001, 0.9)
-    if iteration % val_iter == 0:
-        loss = model.calc_loss(X, y)
-        print "%d th training. Loss: %f" % (iteration, loss)
-        print "======================================================="
+        modules = {}
+        for name in module_values:
+            moduleType = module_values[name][-1]
+            if moduleType == "GRU":
+                modules[name] = layers.GRU(*module_values[name])
+            elif moduleType == "FF":
+                modules[name] = layers.FF(*module_values[name])
+
+        m = Model(*sizes, modules = modules) 
+
+        return m
