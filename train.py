@@ -6,12 +6,14 @@ from model import Model
 from sessionizer import Sessionizer
 import pickle
 
+print(chr(27) + "[2J")
 snizer = Sessionizer()
 start_time = datetime.now()
 time = start_time.strftime('%d-%m %H:%M:%S')
 print("[%s: Loading sessions...]" % time)
 sessions = snizer.get_sessions_with_numbers()
 print("[Loaded %s sessions. It took %d seconds.]" % (len(sessions), (datetime.now() - start_time).seconds))
+sys.stdout.flush()
 
 #from data import train_x, train_y, test_x, test_y, index2word
 index2word = pickle.load( open( "../data/index2word.p", "rb" ) )
@@ -26,7 +28,6 @@ def train_with_sgd(m, learning_rate=0.005, evaluate_loss_after=10):
     num_examples_seen = 0
     sessions_seen = 0
 
-    print(chr(27) + "[2J")
     print("Beginning training...")
     while losses[-1][1] > 0.1:
         
@@ -75,6 +76,7 @@ def train_with_sgd(m, learning_rate=0.005, evaluate_loss_after=10):
                 sys.stdout.flush()
         sessions_seen += 1
         print("[Visited %s examples. It took %d seconds.]" % (ecount, (datetime.now() - start_time).seconds))
+        sys.stdout.flush()
 
 start_time = datetime.now()
 time = start_time.strftime('%d-%m %H:%M:%S')

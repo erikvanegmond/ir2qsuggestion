@@ -91,7 +91,7 @@ class Model:
     @staticmethod
     def save(model, filestr):
         
-        filestr += '-' + str(model.inputSize) + 'x' + str(model.hiddenSize) + 'x' + str(model.outputSize) + '.p'
+        filestr += '-' + str(model.inputSize) + 'x' + str(model.hiddenSize) + 'x' + str(model.outputSize)
         print("[Saving model to %s...]" % filestr)
         
         #pickle.dump(model, open(filestr, 'wb'))
