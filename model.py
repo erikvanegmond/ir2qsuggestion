@@ -34,8 +34,8 @@ class Model:
         x_e = T.ivector('x_e')
         y = T.ivector("y")
 
-        y_d = y#[1:]
-        y_x = y#[:-1]
+        y_d = y[1:]
+        y_x = y[:-1]
 
         #encoder loop
         s_e, updates = theano.scan(
@@ -63,14 +63,27 @@ class Model:
 
         [o_d_free, s_d_free], updates = theano.scan(
             decoder_out_free,
-            outputs_info=[dict(initial=T.cast(T.constant(word2index["</s>"]), "int64")), dict(initial=vector_rep)],
+            outputs_info=[dict(initial=T.cast(T.constant(word2index["<q>"]), "int64")), dict(initial=vector_rep)],
             n_steps = self.query_len)
+        
+        def likelhood(y_x, prev):
+            s = decoder.step(y_x, prev)
+            o_t = ffout.step(s)
+
+            return o_t[y_x], s
+
+        [o_d_like, s_d_like], updates = theano.scan(
+            likelhood,
+            sequences=y_x,
+            outputs_info=[None, dict(initial=vector_rep)])
+        l_hood = T.prod(o_d_like)
 
         cost = T.sum(T.nnet.categorical_crossentropy(o_d, y_d))
 
         self.predict_class = theano.function([x_e], o_d_free)
         self.vector_rep = theano.function([x_e], vector_rep)
         self.ce_error = theano.function([x_e, y], cost)
+        self.likelihood = theano.function([x_e, y], l_hood)
 
 
         lr = T.scalar('learning rate')
@@ -91,7 +104,7 @@ class Model:
     @staticmethod
     def save(model, filestr):
         
-        filestr += '-' + str(model.inputSize) + 'x' + str(model.hiddenSize) + 'x' + str(model.outputSize)
+        filestr += '_' + str(model.inputSize) + 'x' + str(model.hiddenSize) + 'x' + str(model.outputSize)
         print("[Saving model to %s...]" % filestr)
         
         #pickle.dump(model, open(filestr, 'wb'))
