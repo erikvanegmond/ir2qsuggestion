@@ -24,18 +24,15 @@ class CosineSimilarity(Feature):
 
             l_q = CosineSimilarity.vector_len(c)
             features.append(dot/(l_cq*l_q))
-            Feature.cooccurrences[compared_query]['cosinesimilarity'] = features
+            # I don't think this makes sence as the queries in this method are not necessarily the coocurence queries
+            # Feature.cooccurrences[compared_query]['cosinesimilarity'] = features
         return features
 
     @staticmethod
     def query2vector(query):
-        vec = []
-        for word in query.split():
-            vec.append(CosineSimilarity.w2n[word])
-        return vec
+        return map(lambda x: CosineSimilarity.w2n[x], query.split())
 
     @staticmethod
     def vector_len(vector_counter):
-        l = math.sqrt(sum(map(lambda x: x**2, vector_counter.values())))
-        return l
+        return math.sqrt(sum(map(lambda x: x**2, vector_counter.values())))
 
