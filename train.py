@@ -11,8 +11,10 @@ snizer = Sessionizer()
 start_time = datetime.now()
 time = start_time.strftime('%d-%m %H:%M:%S')
 print("[%s: Loading sessions...]" % time)
-sessions = snizer.get_sessions_with_numbers()
-sessions = utils.appent_start_stop_num(sessions)
+with open('../data/augmented_data.p', 'rb') as f:
+    sessions = pickle.load(f)
+#sessions = snizer.get_sessions_with_numbers()
+#sessions = utils.appent_start_stop_num(sessions)
 print("[Loaded %s sessions. It took %d seconds.]" % (len(sessions), (datetime.now() - start_time).seconds))
 #test_size = 2
 #test, train = utils.create_test_train(sessions, test_size)
