@@ -1,4 +1,4 @@
-import pickle
+import cPickle
 import numpy as np
 
 def create_word_mappings():
@@ -24,16 +24,14 @@ def create_test_train(data, test_size):
 
     return test, train
     
-def appent_start_stop_num(sessions, aug_data=None):
-    word2index = pickle.load( open( "../data/word2index.p", "rb" ) )
-    if aug_data == None:
-        aug_data = []
-    else:
-        aug_data = aug_data
+def append_start_stop_num(sessions):
+    word2index = cPickle.load( open( "../data/word2index.p", "rb" ) )
+    aug_data = []
+
     queries = 0
-    sessions_counter = len(aug_data)
+    sessions_counter = 0
     
-    for i in np.arange(len(aug_data), len(sessions)):
+    for i in np.arange(len(sessions)):
         session = sessions[i]
         aug_session = []
         for query in session:
@@ -42,8 +40,9 @@ def appent_start_stop_num(sessions, aug_data=None):
             queries += 1
         aug_data.append(aug_session)
         sessions_counter += 1
-        if sessions_counter % 10000 == 0:
+        if sessions_counter % 100000 == 0:
             print 'Added start- and stop symbols to %s queries and %d/%f sessions.' % (queries, sessions_counter, len(sessions))
-            pickle.dump(aug_data, open('../data/augmented_data.p', 'wb'))
+            with open('../data/augmented_data.pkl', 'wb') as f:
+                cPickle.dump(aug_data, f)
     
     return aug_data
