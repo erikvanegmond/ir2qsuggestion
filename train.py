@@ -1,32 +1,25 @@
 import numpy as np
 import sys
-import utils
 from datetime import datetime
 from model import Model
 from sessionizer import Sessionizer
 import cPickle as pickle
 
-print(chr(27) + "[2J")
 snizer = Sessionizer()
 start_time = datetime.now()
 time = start_time.strftime('%d-%m %H:%M:%S')
 print("[%s: Loading sessions...]" % time)
-#with open('../data/augmented_data.pkl', 'rb') as f:
-#    sessions = pickle.load(f)
-sessions = snizer.get_sessions_with_numbers()
-#sessions = utils.append_start_stop_num(sessions)
-#print("[Loaded %s sessions. It took %d seconds.]" % (len(sessions), (datetime.now() - start_time).seconds))
-#test_size = 2
-#test, train = utils.create_test_train(sessions, test_size)
-#print("[Created the test (%s) and train (%d) sets...]" % (len(test), len(train)))
-#sys.stdout.flush()
+with open('../data/aug_tr_session.pkl', 'rb') as f:
+    tr_sessions = pickle.load(f)
+with open('../data/aug_val_session.pkl', 'rb') as f:
+    val_sessions = pickle.load(f)
+print("[Loaded %s train and %d val sessions. It took %f seconds.]" % (len(tr_sessions), len(val_sessions), (datetime.now() - start_time).seconds))
+val = np.random.choice(val_sessions, 5)
+sys.stdout.flush()
 
-#from data import train_x, train_y, test_x, test_y, index2word
-#index2word = pickle.load( open( "../data/index2word.p", "rb" ) )
+index2word = pickle.load( open( "../data/index2word.p", "rb" ) )
 
 HIDDEN_SIZE = 1000
-
-#print(len(train_x), len(test_x), len(train_y), len(test_y))
 
 def train_with_sgd(m, learning_rate=0.01, evaluate_loss_after=10):
     # We keep track of the losses so we can plot them later
@@ -41,11 +34,11 @@ def train_with_sgd(m, learning_rate=0.01, evaluate_loss_after=10):
         if (sessions_seen % evaluate_loss_after == 0):
             print("[Calculating test loss...]")
             loss = 0
-            for session in test:
+            for session in val:
                 X_test = session[:-1]
                 y_test = session[1:]
                 loss += m.calculate_loss(X_test, y_test)
-            loss /= len(test)
+            loss /= len(val)
             losses.append((num_examples_seen, loss))
             time = datetime.now().strftime('%d-%m %H:%M:%S')
             print("")
@@ -55,7 +48,7 @@ def train_with_sgd(m, learning_rate=0.01, evaluate_loss_after=10):
                 save_path = "../models/" + datetime.now().strftime('%d-%m_') + str(loss)[:5]
                 Model.save(m, save_path)
 
-            for x in np.random.choice(test):
+            for x in np.random.choice(val):
 
                 model_out = m.predict_class(x)
                 out = [index2word[i] for i in model_out]
@@ -74,7 +67,7 @@ def train_with_sgd(m, learning_rate=0.01, evaluate_loss_after=10):
         time = start_time.strftime('%d-%m %H:%M:%S')
         print("[%s: Starting epoch %d...]" % (time, sessions_seen))
         
-        session = np.random.choice(train)        
+        session = np.random.choice(tr_sessions)        
         X = session[:-1]
         y = session[1:]
         # For each training example...
@@ -90,17 +83,17 @@ def train_with_sgd(m, learning_rate=0.01, evaluate_loss_after=10):
         print("[Visited %s examples. It took %d seconds.]" % (ecount, (datetime.now() - start_time).seconds))
         sys.stdout.flush()
 
+start_time = datetime.now()
+time = start_time.strftime('%d-%m %H:%M:%S')
+print("[%s: Creating model...]" % time)
+m = Model(len(index2word), HIDDEN_SIZE, len(index2word))
+print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
+
 #start_time = datetime.now()
 #time = start_time.strftime('%d-%m %H:%M:%S')
-#print("[%s: Creating model...]" % time)
-#m = Model(len(index2word), HIDDEN_SIZE, len(index2word))
+#print("[%s: Loading model...]" % time)
+#m = Model.load('../models/26-11_11.40_90004x1000x90004.npz')
 #print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
-#
-##start_time = datetime.now()
-##time = start_time.strftime('%d-%m %H:%M:%S')
-##print("[%s: Loading model...]" % time)
-##m = Model.load('../models/26-11_11.40_90004x1000x90004.npz')
-##print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
-#
-#train_with_sgd(m)
+
+train_with_sgd(m)
 
