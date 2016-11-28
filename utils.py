@@ -55,7 +55,7 @@ def append_start_stop_num(sessions, name):
         else:
             bad_sessions += 1
     return aug_data
-    
+
 def checkEqual(iterator):
     iterator = iter(iterator)
     try:
