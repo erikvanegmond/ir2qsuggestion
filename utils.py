@@ -1,4 +1,4 @@
-import cPickle
+import cPickle as pickle
 import numpy as np
 
 def create_word_mappings():
@@ -24,25 +24,42 @@ def create_test_train(data, test_size):
 
     return test, train
     
-def append_start_stop_num(sessions):
-    word2index = cPickle.load( open( "../data/word2index.p", "rb" ) )
+def append_start_stop_num(sessions, name):
+    word2index = pickle.load( open( "../data/word2index.p", "rb" ) )
     aug_data = []
 
     queries = 0
+    bad_sessions = 0
     sessions_counter = 0
-    
+    # Loop over all sessions
     for i in np.arange(len(sessions)):
         session = sessions[i]
-        aug_session = []
-        for query in session:
-            aug_query = np.append(np.append(word2index['<q>'], query), word2index['</q>'])
-            aug_session.append(aug_query)
-            queries += 1
-        aug_data.append(aug_session)
-        sessions_counter += 1
-        if sessions_counter % 100000 == 0:
-            print 'Added start- and stop symbols to %s queries and %d/%f sessions.' % (queries, sessions_counter, len(sessions))
-            with open('../data/augmented_data.pkl', 'wb') as f:
-                cPickle.dump(aug_data, f)
-    
+        # If all the queries in this session are the same, do not add.
+        if not checkEqual(session):
+            aug_session = []
+            # Go over all queries
+            for query in session:
+                # Append the start and stop symbol (in indices)
+                aug_query = np.append(np.append(word2index['<q>'], query), word2index['</q>'])
+                # Add query to session
+                aug_session.append(aug_query)
+                queries += 1
+            # Add session to data
+            aug_data.append(aug_session)
+            sessions_counter += 1
+            # Store the data every 100.000 sessions.
+            if sessions_counter % 100000 == 0:
+                print '%s sessions. Parsed %d queries. %f sessions skipped.' % (sessions_counter, queries, bad_sessions)
+                with open('../data/aug_'+ name + '.pkl', 'wb') as f:
+                    pickle.dump(aug_data, f) 
+        else:
+            bad_sessions += 1
     return aug_data
+    
+def checkEqual(iterator):
+    iterator = iter(iterator)
+    try:
+        first = next(iterator)
+    except StopIteration:
+        return True
+    return all(first == rest for rest in iterator)

@@ -11,24 +11,24 @@ snizer = Sessionizer()
 start_time = datetime.now()
 time = start_time.strftime('%d-%m %H:%M:%S')
 print("[%s: Loading sessions...]" % time)
-with open('../data/augmented_data.pkl', 'rb') as f:
-    sessions = pickle.load(f)
-#sessions = snizer.get_sessions_with_numbers()
+#with open('../data/augmented_data.pkl', 'rb') as f:
+#    sessions = pickle.load(f)
+sessions = snizer.get_sessions_with_numbers()
 #sessions = utils.append_start_stop_num(sessions)
-print("[Loaded %s sessions. It took %d seconds.]" % (len(sessions), (datetime.now() - start_time).seconds))
-test_size = 2
-test, train = utils.create_test_train(sessions, test_size)
-print("[Created the test (%s) and train (%d) sets...]" % (len(test), len(train)))
-sys.stdout.flush()
+#print("[Loaded %s sessions. It took %d seconds.]" % (len(sessions), (datetime.now() - start_time).seconds))
+#test_size = 2
+#test, train = utils.create_test_train(sessions, test_size)
+#print("[Created the test (%s) and train (%d) sets...]" % (len(test), len(train)))
+#sys.stdout.flush()
 
 #from data import train_x, train_y, test_x, test_y, index2word
-index2word = pickle.load( open( "../data/index2word.p", "rb" ) )
+#index2word = pickle.load( open( "../data/index2word.p", "rb" ) )
 
 HIDDEN_SIZE = 1000
 
 #print(len(train_x), len(test_x), len(train_y), len(test_y))
 
-def train_with_sgd(m, learning_rate=0.05, evaluate_loss_after=10):
+def train_with_sgd(m, learning_rate=0.01, evaluate_loss_after=10):
     # We keep track of the losses so we can plot them later
     losses = [( 0, 1000.0 )]
     num_examples_seen = 0
@@ -90,17 +90,17 @@ def train_with_sgd(m, learning_rate=0.05, evaluate_loss_after=10):
         print("[Visited %s examples. It took %d seconds.]" % (ecount, (datetime.now() - start_time).seconds))
         sys.stdout.flush()
 
-start_time = datetime.now()
-time = start_time.strftime('%d-%m %H:%M:%S')
-print("[%s: Creating model...]" % time)
-m = Model(len(index2word), HIDDEN_SIZE, len(index2word))
-print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
-
 #start_time = datetime.now()
 #time = start_time.strftime('%d-%m %H:%M:%S')
-#print("[%s: Loading model...]" % time)
-#m = Model.load('../models/26-11_11.40_90004x1000x90004.npz')
+#print("[%s: Creating model...]" % time)
+#m = Model(len(index2word), HIDDEN_SIZE, len(index2word))
 #print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
-
-train_with_sgd(m)
+#
+##start_time = datetime.now()
+##time = start_time.strftime('%d-%m %H:%M:%S')
+##print("[%s: Loading model...]" % time)
+##m = Model.load('../models/26-11_11.40_90004x1000x90004.npz')
+##print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
+#
+#train_with_sgd(m)
 
