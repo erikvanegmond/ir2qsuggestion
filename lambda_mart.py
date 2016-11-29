@@ -188,31 +188,31 @@ def next_query_prediction(sessions, experiment_string):
         print "loaded!!!!"
     else:
         for i, session in enumerate(sessions):
-            if i < 1000:
-                session_length = len(session)
-                # get anchor query and target query from session
-                anchor_query = session[session_length - 2]
-                target_query = session[session_length - 1]
-                # extract 20 queries with the highest ADJ score (most likely to follow the anchor query in the data)
-                features, highest_adj_queries = create_features(anchor_query, session)
-                # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
-                if target_query in highest_adj_queries and 19 < len(highest_adj_queries):
-                    print("Session: " + str(i))
-                    target_vector = -1 * np.ones(len(highest_adj_queries))
-                    [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
-                    target_vector[target_query_index] = 1
-                    # then add the session to the train, val, test data
-                    indexes = np.array(range(0, len(highest_adj_queries)))
-                    sess_data = np.vstack((np.transpose(target_vector), features))
-                    sess_data = np.vstack((sess_data, np.transpose(indexes)))
-                    if used_sess == 0:
-                        lambdamart_data = sess_data
-                        used_sess += 1
-                    else:
-                        lambdamart_data = np.hstack((lambdamart_data, sess_data))
-                        used_sess += 1
+            #if i < 1000:
+            session_length = len(session)
+            # get anchor query and target query from session
+            anchor_query = session[session_length - 2]
+            target_query = session[session_length - 1]
+            # extract 20 queries with the highest ADJ score (most likely to follow the anchor query in the data)
+            features, highest_adj_queries = create_features(anchor_query, session)
+            # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
+            if target_query in highest_adj_queries and 19 < len(highest_adj_queries):
+                print("Session: " + str(i))
+                target_vector = -1 * np.ones(len(highest_adj_queries))
+                [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
+                target_vector[target_query_index] = 1
+                # then add the session to the train, val, test data
+                indexes = np.array(range(0, len(highest_adj_queries)))
+                sess_data = np.vstack((np.transpose(target_vector), features))
+                sess_data = np.vstack((sess_data, np.transpose(indexes)))
+                if used_sess == 0:
+                    lambdamart_data = sess_data
+                    used_sess += 1
                 else:
-                    continue
+                    lambdamart_data = np.hstack((lambdamart_data, sess_data))
+                    used_sess += 1
+            else:
+                continue
 
         pkl_file = open('lamdamart_data_' + experiment_string + '.pkl', 'wb')
         pkl.dump(lambdamart_data, pkl_file)
