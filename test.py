@@ -22,11 +22,13 @@ start_time = datetime.now()
 time = start_time.strftime('%d-%m %H:%M:%S')
 print("[%s: Calculating loss...]" % time)
 losses = []
-for session in test_sessions:
+for i, session in enumerate(test_sessions):
     X_test = session[:-1]
     y_test = session[1:]
     loss = m.calculate_loss(X_test, y_test)
     losses.append(loss)
+    if i % 10000 == 0:
+        print('Loss after %s sessions is: %d' % (i, np.mean(losses)))
 print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
 
 print("Mean loss: %s" % (np.mean(losses)))

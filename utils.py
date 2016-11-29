@@ -98,7 +98,7 @@ def create_feature_data():
     start_time = datetime.now()
     time = start_time.strftime('%d-%m %H:%M:%S')
     print("[%s: Loading model...]" % time)
-    m = Model.load('../models/27-11_4.025_90005x1000x90005.npz')
+    m = Model.load('../models/29-11_4.589_0_90005x1000x90005.npz')
     print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
     
     features = {}
