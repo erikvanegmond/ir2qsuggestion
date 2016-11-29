@@ -1,5 +1,12 @@
 import cPickle as pickle
 import numpy as np
+import features.adj as adj
+import features.ranker as ranker
+from datetime import datetime
+from model import Model
+from sessionizer import Sessionizer
+
+ranker.Ranker(sessions_file='../data/bg_session')
 
 def create_word_mappings():
     print 'Loading aol_vocab.dict.pkl...'
@@ -63,3 +70,63 @@ def checkEqual(iterator):
     except StopIteration:
         return True
     return all(first == rest for rest in iterator)
+    
+def vectorify(string, word2index):
+    vect = []
+    for words in string.split():
+        try:
+            word = word2index[words]
+        except KeyError:
+            word = word2index['<unk>']
+        vect.append(word)
+    vect = np.append(np.append(word2index['<q>'], vect), word2index['</q>'])
+    
+    return vect.astype(np.int32)
+    
+def create_feature_data():
+    ADJ = adj.ADJ()
+    
+    start_time = datetime.now()
+    time = start_time.strftime('%d-%m %H:%M:%S')
+    print("[%s: Loading sessions...]" % time)
+    sessionize = Sessionizer()
+    sessions = sessionize.get_sessions()
+    print("[Loaded %s test sessions. It took %f seconds.]" % (len(sessions), (datetime.now() - start_time).seconds))
+    
+    word2index = pickle.load( open( "../data/word2index.p", "rb" ) )
+    
+    start_time = datetime.now()
+    time = start_time.strftime('%d-%m %H:%M:%S')
+    print("[%s: Loading model...]" % time)
+    m = Model.load('../models/29-11_4.589_0_90005x1000x90005.npz')
+    print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
+    
+    features = {}
+    queries = 0
+    bad_sessions = 0
+    
+    start_time = datetime.now()
+    time = start_time.strftime('%d-%m %H:%M:%S')
+    print("[%s: Creating features...]" % time)
+    for session in sessions:
+        # We only want sessions with 10 queries in the context and that have different queries
+        if len(session) > 11 and not checkEqual(session):
+            # Get the anchor queries
+            anchor_query = session[-2]
+            features[anchor_query] = {}
+            adj_dict = ADJ.adj_function(anchor_query)
+            highest_adj_queries = adj_dict['adj_queries']
+            # Calculate the likelihood between the queries
+            for sug_query in highest_adj_queries:
+                num_anchor_query = vectorify(anchor_query, word2index)
+                num_sug_query = vectorify(sug_query, word2index)                    
+                likelihood = m.likelihood(num_anchor_query, num_sug_query)
+                features[anchor_query][sug_query] = likelihood
+            queries += 1
+            if queries % 1000000 == 0:
+                print("[Visited %s anchor queries. %d sessions were skipped.]" % (queries, bad_sessions))
+        else:
+            bad_sessions += 1
+
+    pickle.dump(features, open('../data/HRED_features.pkl', 'wb'))
+    print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
