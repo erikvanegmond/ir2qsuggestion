@@ -24,6 +24,7 @@ HIDDEN_SIZE = 1000
 def train_with_sgd(m, learning_rate=0.01, evaluate_loss_after=10):
     # We keep track of the losses so we can plot them later
     losses = [( 0, 1000.0 )]
+    min_loss = losses[-1][1]
     num_examples_seen = 0
     sessions_seen = 0
 
@@ -44,8 +45,9 @@ def train_with_sgd(m, learning_rate=0.01, evaluate_loss_after=10):
             print("")
             print("[%s: Loss after %d examples = %f]" % (time, num_examples_seen, loss))
             sys.stdout.flush()
-            if (len(losses) > 1 and losses[-2][1] - losses[-1][1] >= 0.1):
-                save_path = "../models/" + datetime.now().strftime('%d-%m_') + str(loss)[:5]
+            if (len(losses) > 1 and min_loss - losses[-1][1] >= 0.1):
+                min_loss = losses[-1][1]
+                save_path = "../models/" + datetime.now().strftime('%d-%m_') + str(min_loss)[:5] + '_' + str(num_examples_seen)
                 Model.save(m, save_path)
 
             for x in np.random.choice(val):
@@ -83,17 +85,17 @@ def train_with_sgd(m, learning_rate=0.01, evaluate_loss_after=10):
         print("[Visited %s examples. It took %d seconds.]" % (ecount, (datetime.now() - start_time).seconds))
         sys.stdout.flush()
 
-start_time = datetime.now()
-time = start_time.strftime('%d-%m %H:%M:%S')
-print("[%s: Creating model...]" % time)
-m = Model(len(index2word), HIDDEN_SIZE, len(index2word))
-print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
-
 #start_time = datetime.now()
 #time = start_time.strftime('%d-%m %H:%M:%S')
-#print("[%s: Loading model...]" % time)
-#m = Model.load('../models/26-11_11.40_90004x1000x90004.npz')
+#print("[%s: Creating model...]" % time)
+#m = Model(len(index2word), HIDDEN_SIZE, len(index2word))
 #print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
+
+start_time = datetime.now()
+time = start_time.strftime('%d-%m %H:%M:%S')
+print("[%s: Loading model...]" % time)
+m = Model.load('../models/28-11_5.532_90005x1000x90005.npz')
+print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
 
 train_with_sgd(m)
 

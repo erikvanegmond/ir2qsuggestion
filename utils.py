@@ -42,7 +42,7 @@ def append_start_stop_num(sessions, name):
                 # Append the start and stop symbol (in indices)
                 aug_query = np.append(np.append(word2index['<q>'], query), word2index['</q>'])
                 # Add query to session
-                aug_session.append(aug_query)
+                aug_session.append(aug_query.astype(np.int32))
                 queries += 1
             # Add session to data
             aug_data.append(aug_session)
@@ -50,10 +50,10 @@ def append_start_stop_num(sessions, name):
             # Store the data every 100.000 sessions.
             if sessions_counter % 100000 == 0:
                 print '%s sessions. Parsed %d queries. %f sessions skipped.' % (sessions_counter, queries, bad_sessions)
-                with open('../data/aug_'+ name + '.pkl', 'wb') as f:
-                    pickle.dump(aug_data, f) 
         else:
             bad_sessions += 1
+    with open('../data/aug_'+ name + '.pkl', 'wb') as f:
+        pickle.dump(aug_data, f) 
     return aug_data
 
 def checkEqual(iterator):
