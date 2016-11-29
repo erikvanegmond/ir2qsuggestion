@@ -16,6 +16,8 @@ import features.cossimilar as cs
 import features.length as lg
 import features.lengthdiff as ld
 import features.levenstein as levs
+# import features.HRED as hredf
+import features.bg_count as bgcount
 import sessionizer as sn
 
 
@@ -27,6 +29,8 @@ lev = levs.Levenshtein()
 lendif = ld.LengthDiff()
 leng = lg.Length()
 coss = cs.CosineSimilarity()
+# hred = hredf.HRED()
+bgc = bgcount.BgCount()
 
 
 def get_query_index_pointers(dataset):
@@ -138,6 +142,7 @@ def create_features(anchor_query, session):
     adj_dict = adj.adj_function(anchor_query)
     highest_adj_queries = adj_dict['adj_queries']
     sugg_features = adj_dict['absfreq']
+    bgcount_features = bgc.calculate_feature(anchor_query, highest_adj_queries)
     for query in highest_adj_queries:
         if session_length > 11:
             # Take the features of the 10 most recent queries (contextual features)
@@ -163,7 +168,8 @@ def create_features(anchor_query, session):
         lendif_features.append(lendif_per_query)
         leng_features.append(leng_per_query)
         coss_features.append(coss_per_query)
-    features = np.vstack((np.array(sugg_features), np.transpose(np.array(lev_features))))
+    features = np.vstack((np.array(sugg_features), np.array(bgcount_features)))
+    features = np.vstack((features, np.transpose(np.array(lev_features))))
     features = np.vstack((features, np.transpose(np.array(lendif_features))))
     features = np.vstack((features, np.transpose(np.array(leng_features))))
     features = np.vstack((features, np.transpose(np.array(coss_features))))
@@ -182,30 +188,31 @@ def next_query_prediction(sessions, experiment_string):
         print "loaded!!!!"
     else:
         for i, session in enumerate(sessions):
-            session_length = len(session)
-            # get anchor query and target query from session
-            anchor_query = session[session_length - 2]
-            target_query = session[session_length - 1]
-            # extract 20 queries with the highest ADJ score (most likely to follow the anchor query in the data)
-            features, highest_adj_queries = create_features(anchor_query, session)
-            # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
-            if target_query in highest_adj_queries and 19 < len(highest_adj_queries):
-                print("Session: " + str(i))
-                target_vector = -1 * np.ones(len(highest_adj_queries))
-                [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
-                target_vector[target_query_index] = 1
-                # then add the session to the train, val, test data
-                indexes = np.array(range(0, len(highest_adj_queries)))
-                sess_data = np.vstack((np.transpose(target_vector), features))
-                sess_data = np.vstack((sess_data, np.transpose(indexes)))
-                if used_sess == 0:
-                    lambdamart_data = sess_data
-                    used_sess += 1
+            if i < 1000:
+                session_length = len(session)
+                # get anchor query and target query from session
+                anchor_query = session[session_length - 2]
+                target_query = session[session_length - 1]
+                # extract 20 queries with the highest ADJ score (most likely to follow the anchor query in the data)
+                features, highest_adj_queries = create_features(anchor_query, session)
+                # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
+                if target_query in highest_adj_queries and 19 < len(highest_adj_queries):
+                    print("Session: " + str(i))
+                    target_vector = -1 * np.ones(len(highest_adj_queries))
+                    [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
+                    target_vector[target_query_index] = 1
+                    # then add the session to the train, val, test data
+                    indexes = np.array(range(0, len(highest_adj_queries)))
+                    sess_data = np.vstack((np.transpose(target_vector), features))
+                    sess_data = np.vstack((sess_data, np.transpose(indexes)))
+                    if used_sess == 0:
+                        lambdamart_data = sess_data
+                        used_sess += 1
+                    else:
+                        lambdamart_data = np.hstack((lambdamart_data, sess_data))
+                        used_sess += 1
                 else:
-                    lambdamart_data = np.hstack((lambdamart_data, sess_data))
-                    used_sess += 1
-            else:
-                continue
+                    continue
 
         pkl_file = open('lamdamart_data_' + experiment_string + '.pkl', 'wb')
         pkl.dump(lambdamart_data, pkl_file)
