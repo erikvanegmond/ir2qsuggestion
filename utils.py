@@ -109,24 +109,28 @@ def create_feature_data():
     time = start_time.strftime('%d-%m %H:%M:%S')
     print("[%s: Creating features...]" % time)
     for session in sessions:
-        # We only want sessions with 10 queries in the context and that have different queries
-        if len(session) > 11 and not checkEqual(session):
+        # We only want queries with different queries
+        if not checkEqual(session):
             # Get the anchor queries
             anchor_query = session[-2]
-            features[anchor_query] = {}
             adj_dict = ADJ.adj_function(anchor_query)
             highest_adj_queries = adj_dict['adj_queries']
-            # Calculate the likelihood between the queries
-            for sug_query in highest_adj_queries:
-                num_anchor_query = vectorify(anchor_query, word2index)
-                num_sug_query = vectorify(sug_query, word2index)                    
-                likelihood = m.likelihood(num_anchor_query, num_sug_query)
-                features[anchor_query][sug_query] = likelihood
-            queries += 1
-            if queries % 1000000 == 0:
-                print("[Visited %s anchor queries. %d sessions were skipped.]" % (queries, bad_sessions))
+            # We only use the session if the correct query is in the 20 most occurring ones
+            if session[-1] in highest_adj_queries:
+                features[anchor_query] = {}
+                # Calculate the likelihood between the queries
+                for sug_query in highest_adj_queries:
+                    num_anchor_query = vectorify(anchor_query, word2index)
+                    num_sug_query = vectorify(sug_query, word2index)                    
+                    likelihood = m.likelihood(num_anchor_query, num_sug_query)
+                    features[anchor_query][sug_query] = likelihood
+                queries += 1                
+            else:
+                bad_sessions += 1
         else:
             bad_sessions += 1
-
+        if queries % 100000 == 0:
+            print("[Visited %s anchor queries. %d sessions were skipped.]" % (queries, bad_sessions))
+    print("[Saving features %s features.]" % (len(features)))
     pickle.dump(features, open('../data/HRED_features.pkl', 'wb'))
     print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
