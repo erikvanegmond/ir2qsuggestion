@@ -98,7 +98,7 @@ def create_feature_data():
     start_time = datetime.now()
     time = start_time.strftime('%d-%m %H:%M:%S')
     print("[%s: Loading model...]" % time)
-    m = Model.load('../models/29-11_4.589_0_90005x1000x90005.npz')
+    m = Model.load('../models/27-11_4.025_90005x1000x90005.npz')
     print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
     
     features = {}
@@ -129,8 +129,9 @@ def create_feature_data():
                 bad_sessions += 1
         else:
             bad_sessions += 1
-        if queries % 100000 == 0:
+        if queries % 100 == 0:
             print("[Visited %s anchor queries. %d sessions were skipped.]" % (queries, bad_sessions))
+            pickle.dump(features, open('../data/HRED_features.pkl', 'wb'))
     print("[Saving features %s features.]" % (len(features)))
     pickle.dump(features, open('../data/HRED_features.pkl', 'wb'))
     print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
