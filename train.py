@@ -1,7 +1,11 @@
+"""
+This script trains the HRED model using SGD
+"""
+
 import numpy as np
 import sys
 from datetime import datetime
-from model import Model
+from model.model import Model
 from sessionizer import Sessionizer
 import cPickle as pickle
 

@@ -1,8 +1,6 @@
 import numpy as np
 import theano as theano
 import theano.tensor as T
-from theano.gradient import grad_clip
-import time
 import layers
 import pickle
 

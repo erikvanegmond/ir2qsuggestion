@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Nov 28 14:50:50 2016
-
-@author: Jaimy
+This file appends <q> and </q> to the queries in the different session files. 
+It results in sessions that contain more than one unique query.
 """
 
 import utils

@@ -1,5 +1,9 @@
+"""
+This script calculates the loss of a model over the test set.
+"""
+
 from datetime import datetime
-from model import Model
+from model.model import Model
 from sessionizer import Sessionizer
 import cPickle as pickle
 import numpy as np
