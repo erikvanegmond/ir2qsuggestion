@@ -31,7 +31,5 @@ class Sessionizer(object):
     def get_sessions_with_numbers(self):
         if not len(self.number_sessions):
             self.find_all_sessions()
-        else:
-            print "no need to get sessions again, we have them!"
 
         return self.number_sessions
