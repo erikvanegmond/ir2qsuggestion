@@ -7,6 +7,8 @@ import pickle as pkl
 
 
 class Ranker(object):
+    sessionizer = None
+    bg_sessionizer = None
     sessions = []
     bg_sessions = []
     cooccurrences = defaultdict(dict)
@@ -16,10 +18,10 @@ class Ranker(object):
 
     def __init__(self, train_sessions_file="../data/tr_session", bg_sessions_file="../data/bg_session", vocab_file="../data/aol_vocab.dict.pkl"):
         if not len(Ranker.sessions):
-            sessionizer = Sessionizer(data_path=train_sessions_file)
-            Ranker.sessions = sessionizer.get_sessions()
-            bg_sessionizer = Sessionizer(data_path=bg_sessions_file)
-            Ranker.bg_sessions = bg_sessionizer.get_sessions()
+            Ranker.sessionizer = Sessionizer(data_path=train_sessions_file)
+            Ranker.sessions = Ranker.sessionizer.get_sessions()
+            Ranker.bg_sessionizer = Sessionizer(data_path=bg_sessions_file)
+            Ranker.bg_sessions = Ranker.bg_sessionizer.get_sessions()
             Ranker.query_counts = Counter(list(itertools.chain.from_iterable(Ranker.bg_sessions)))
         else:
             print "don't have to get the sessions as we already have them"
