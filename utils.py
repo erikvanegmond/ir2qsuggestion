@@ -6,8 +6,6 @@ from datetime import datetime
 from model.model import Model
 from sessionizer import Sessionizer
 
-ranker.Ranker(sessions_file='../data/bg_session')
-
 def create_word_mappings():
     print 'Loading aol_vocab.dict.pkl...'
     vocab = pickle.load(open('../data/aol_vocab.dict.pkl', 'rb'))

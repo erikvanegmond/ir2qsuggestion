@@ -9,11 +9,11 @@ import numpy as np
 class ADJ(Ranker):
     @staticmethod
     def adj_function(anchor_query):
-        if anchor_query in ADJ.cooccurrences:
-            return ADJ.cooccurrences[anchor_query]
+        # if anchor_query in ADJ.cooccurrences:
+        #     return ADJ.cooccurrences[anchor_query]
 
         cooccurrence_list = Counter()
-        for session in ADJ.sessions:
+        for session in ADJ.bg_sessions:
             if anchor_query in session:
                 anchor_occurrence = [i for i, x in enumerate(session) if anchor_query == x]
                 for i in anchor_occurrence:
