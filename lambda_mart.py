@@ -16,9 +16,10 @@ import features.cossimilar as cs
 import features.length as lg
 import features.lengthdiff as ld
 import features.levenstein as levs
-# import features.HRED as hredf
+import features.HRED as hredf
 import features.bg_count as bgcount
 import sessionizer as sn
+import utils
 
 
 sessionize = sn.Sessionizer()
@@ -29,7 +30,7 @@ lev = levs.Levenshtein()
 lendif = ld.LengthDiff()
 leng = lg.Length()
 coss = cs.CosineSimilarity()
-# hred = hredf.HRED()
+hred = hredf.HRED()
 bgc = bgcount.BgCount()
 
 
@@ -143,6 +144,7 @@ def create_features(anchor_query, session):
     highest_adj_queries = adj_dict['adj_queries']
     sugg_features = adj_dict['absfreq']
     bgcount_features = bgc.calculate_feature(anchor_query, highest_adj_queries)
+    hred_features = hred.calculate_feature(anchor_query, highest_adj_queries)
     for query in highest_adj_queries:
         if session_length > 11:
             # Take the features of the 10 most recent queries (contextual features)
@@ -173,11 +175,13 @@ def create_features(anchor_query, session):
     features = np.vstack((features, np.transpose(np.array(lendif_features))))
     features = np.vstack((features, np.transpose(np.array(leng_features))))
     features = np.vstack((features, np.transpose(np.array(coss_features))))
+    features = np.vstack((features, np.transpose(np.array(hred_features))))
     return features, highest_adj_queries
 
 
 def next_query_prediction(sessions, experiment_string):
     used_sess = 0
+    bad_sess = 0
     corresponding_queries = []
 
     if os.path.isfile('lamdamart_data_' + experiment_string + '.pkl'):
@@ -188,15 +192,19 @@ def next_query_prediction(sessions, experiment_string):
         print "loaded!!!!"
     else:
         for i, session in enumerate(sessions):
-            #if i < 1000:
-            session_length = len(session)
+            
+            if utils.checkEqual(session):
+                bad_sess += 1
+                continue
             # get anchor query and target query from session
-            anchor_query = session[session_length - 2]
-            target_query = session[session_length - 1]
+            anchor_query = session[-2]
+            target_query = session[-1]
             # extract 20 queries with the highest ADJ score (most likely to follow the anchor query in the data)
-            features, highest_adj_queries = create_features(anchor_query, session)
+            adj_dict = adj.adj_function(anchor_query)
+            highest_adj_queries = adj_dict['adj_queries']
             # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
             if target_query in highest_adj_queries and 19 < len(highest_adj_queries):
+                features, highest_adj_queries = create_features(anchor_query, session)
                 print("Session: " + str(i))
                 target_vector = -1 * np.ones(len(highest_adj_queries))
                 [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
@@ -212,8 +220,14 @@ def next_query_prediction(sessions, experiment_string):
                     lambdamart_data = np.hstack((lambdamart_data, sess_data))
                     used_sess += 1
             else:
+                bad_sess += 1
                 continue
-
+            if used_sess == len(hred.features):
+                break
+            if used_sess % 1000 == 0:
+                print("[Visited %s anchor queries. %d sessions were skipped.]" % (used_sess, bad_sess))
+                pkl.dump(lambdamart_data, open('lamdamart_data_' + experiment_string + '.pkl', 'wb'))
+                
         pkl_file = open('lamdamart_data_' + experiment_string + '.pkl', 'wb')
         pkl.dump(lambdamart_data, pkl_file)
         pkl_file.close()

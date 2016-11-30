@@ -2,7 +2,7 @@ import cPickle as pickle
 from features.feature import Feature
 
 class DatasetFeature(Feature):
-    features = []
+    features = {}
 
     def __init__(self, data_file="../data/HRED_features.pkl"):
         if not len(DatasetFeature.features):

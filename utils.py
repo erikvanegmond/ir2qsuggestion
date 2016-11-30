@@ -1,82 +1,135 @@
-"""
-@author: Jaimy
-"""
-import numpy
-import theano
-import theano.tensor as T
-import os
+import cPickle as pickle
+import numpy as np
+import features.adj as adj
+import features.ranker as ranker
+from datetime import datetime
+from model import Model
+from sessionizer import Sessionizer
 
+def create_word_mappings():
+    print 'Loading aol_vocab.dict.pkl...'
+    vocab = pickle.load(open('../data/aol_vocab.dict.pkl', 'rb'))
+    print 'Creating mappings for %s words...' % len(vocab)
+    word2index = {w:n1 for w, n1, n2 in vocab}
+    index2word = {n1:w for w, n1, n2 in vocab}
+    start_symbol_idx = max(index2word.keys())+1
+    index2word[start_symbol_idx] = '<q>'
+    word2index['<q>'] = start_symbol_idx
+    print 'Saving to word2index.p...'
+    pickle.dump(word2index, open('../data/word2index.p', 'wb'))
+    print 'Saving to index2word.p...'
+    pickle.dump(index2word, open('../data/index2word.p', 'wb'))
 
-def NormalInit(rng, sizeX, sizeY, scale=0.01, sparsity=-1):
-    """ 
-    Normal Initialization
-    """
-    sizeX = int(sizeX)
-    sizeY = int(sizeY)
+def create_test_train(data, test_size):
+    data = np.array(data)
+    test_idx = np.random.choice(np.arange(len(data)), test_size)
+    train_idx = np.setxor1d(np.arange(len(data)), test_idx)
+    train = data[train_idx]
+    test = data[test_idx]
 
-    if sparsity < 0:
-        sparsity = sizeY
+    return test, train
+    
+def append_start_stop_num(sessions, name):
+    word2index = pickle.load( open( "../data/word2index.p", "rb" ) )
+    aug_data = []
 
-    sparsity = numpy.minimum(sizeY, sparsity)
-    values = numpy.zeros((sizeX, sizeY), dtype=theano.config.floatX)
-    for dx in xrange(sizeX):
-        perm = rng.permutation(sizeY)
-        new_vals = rng.normal(loc=0, scale=scale, size=(sparsity,))
-        values[dx, perm[:sparsity]] = new_vals
+    queries = 0
+    bad_sessions = 0
+    sessions_counter = 0
+    # Loop over all sessions
+    for i in np.arange(len(sessions)):
+        session = sessions[i]
+        # If all the queries in this session are the same, do not add.
+        if not checkEqual(session):
+            aug_session = []
+            # Go over all queries
+            for query in session:
+                # Append the start and stop symbol (in indices)
+                aug_query = np.append(np.append(word2index['<q>'], query), word2index['</q>'])
+                # Add query to session
+                aug_session.append(aug_query.astype(np.int32))
+                queries += 1
+            # Add session to data
+            aug_data.append(aug_session)
+            sessions_counter += 1
+            # Store the data every 100.000 sessions.
+            if sessions_counter % 100000 == 0:
+                print '%s sessions. Parsed %d queries. %f sessions skipped.' % (sessions_counter, queries, bad_sessions)
+        else:
+            bad_sessions += 1
+    with open('../data/aug_'+ name + '.pkl', 'wb') as f:
+        pickle.dump(aug_data, f) 
+    return aug_data
 
-    return values.astype(theano.config.floatX)
-
-
-def OrthogonalInit(rng, shape):
-    if len(shape) != 2:
-        raise ValueError
-
-    if shape[0] == shape[1]:
-        # For square weight matrices we can simplify the logic
-        # and be more exact:
-        M = rng.randn(*shape).astype(theano.config.floatX)
-        Q, R = numpy.linalg.qr(M)
-        Q = Q * numpy.sign(numpy.diag(R))
-        return Q
-
-    M1 = rng.randn(shape[0], shape[0]).astype(theano.config.floatX)
-    M2 = rng.randn(shape[1], shape[1]).astype(theano.config.floatX)
-
-    # QR decomposition of matrix with entries in N(0, 1) is random
-    Q1, R1 = numpy.linalg.qr(M1)
-    Q2, R2 = numpy.linalg.qr(M2)
-    # Correct that NumPy doesn't force diagonal of R to be non-negative
-    Q1 = Q1 * numpy.sign(numpy.diag(R1))
-    Q2 = Q2 * numpy.sign(numpy.diag(R2))
-
-    n_min = min(shape[0], shape[1])
-    return numpy.dot(Q1[:, :n_min], Q2[:n_min, :])
-
-
-def GrabProbs(class_probs, target, gRange=None):
-    if class_probs.ndim > 2:
-        class_probs = class_probs.reshape((class_probs.shape[0] * class_probs.shape[1], class_probs.shape[2]))
-    else:
-        class_probs = class_probs
-    if target.ndim > 1:
-        tflat = target.flatten()
-    else:
-        tflat = target
-
-    # return grabber(class_probs, target).flatten()
-    ### Hack for Theano, much faster than [x, y] indexing 
-    ### avoids a copy onto the GPU
-    return T.diag(class_probs.T[tflat])
-
-
-def SoftMax(x):
-    x = T.exp(x - T.max(x, axis=x.ndim - 1, keepdims=True))
-    return x / T.sum(x, axis=x.ndim - 1, keepdims=True)
-
-
-def save_df(output_dat_path, df, fn):
-    file_path = output_dat_path + fn
-    if not os.path.exists(output_dat_path):
-        os.makedirs(output_dat_path)
-    df.to_csv(file_path, index=False)
-    print "{} saved".format(file_path)
+def checkEqual(iterator):
+    iterator = iter(iterator)
+    try:
+        first = next(iterator)
+    except StopIteration:
+        return True
+    return all(first == rest for rest in iterator)
+    
+def vectorify(string, word2index):
+    vect = []
+    for words in string.split():
+        try:
+            word = word2index[words]
+        except KeyError:
+            word = word2index['<unk>']
+        vect.append(word)
+    vect = np.append(np.append(word2index['<q>'], vect), word2index['</q>'])
+    
+    return vect.astype(np.int32)
+    
+def create_feature_data():
+    ADJ = adj.ADJ()
+    
+    start_time = datetime.now()
+    time = start_time.strftime('%d-%m %H:%M:%S')
+    print("[%s: Loading sessions...]" % time)
+    sessionize = Sessionizer()
+    sessions = sessionize.get_sessions()
+    print("[Loaded %s test sessions. It took %f seconds.]" % (len(sessions), (datetime.now() - start_time).seconds))
+    
+    word2index = pickle.load( open( "../data/word2index.p", "rb" ) )
+    
+    start_time = datetime.now()
+    time = start_time.strftime('%d-%m %H:%M:%S')
+    print("[%s: Loading model...]" % time)
+    m = Model.load('../models/29-11_4.589_0_90005x1000x90005.npz')
+    print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
+    
+    features = {}
+    queries = 0
+    bad_sessions = 0
+    
+    start_time = datetime.now()
+    time = start_time.strftime('%d-%m %H:%M:%S')
+    print("[%s: Creating features...]" % time)
+    for session in sessions:
+        # We only want queries with different queries
+        if not checkEqual(session):
+            # Get the anchor queries
+            anchor_query = session[-2]
+            adj_dict = ADJ.adj_function(anchor_query)
+            highest_adj_queries = adj_dict['adj_queries']
+            # We only use the session if the correct query is in the 20 most occurring ones
+            if session[-1] in highest_adj_queries:
+                features[anchor_query] = {}
+                # Calculate the likelihood between the queries
+                for sug_query in highest_adj_queries:
+                    num_anchor_query = vectorify(anchor_query, word2index)
+                    num_sug_query = vectorify(sug_query, word2index)                    
+                    likelihood = m.likelihood(num_anchor_query, num_sug_query)
+                    features[anchor_query][sug_query] = likelihood
+                queries += 1                
+            else:
+                bad_sessions += 1
+        else:
+            bad_sessions += 1
+        if queries % 100 == 0:
+            print("[Visited %s anchor queries. %d sessions were skipped.]" % (queries, bad_sessions))
+            pickle.dump(features, open('../data/HRED_features.pkl', 'wb'))
+    print("[Saving features %s features.]" % (len(features)))
+    pickle.dump(features, open('../data/HRED_features.pkl', 'wb'))
+    print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
