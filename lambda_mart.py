@@ -144,7 +144,7 @@ def create_features(anchor_query, session):
     highest_adj_queries = adj_dict['adj_queries']
     sugg_features = adj_dict['absfreq']
     bgcount_features = bgc.calculate_feature(anchor_query, highest_adj_queries)
-    hred_features = hred.calculate_feature(anchor_query, highest_adj_queries)
+    #hred_features = hred.calculate_feature(anchor_query, highest_adj_queries)
     for query in highest_adj_queries:
         if session_length > 11:
             # Take the features of the 10 most recent queries (contextual features)
@@ -175,7 +175,7 @@ def create_features(anchor_query, session):
     features = np.vstack((features, np.transpose(np.array(lendif_features))))
     features = np.vstack((features, np.transpose(np.array(leng_features))))
     features = np.vstack((features, np.transpose(np.array(coss_features))))
-    features = np.vstack((features, np.transpose(np.array(hred_features))))
+    #features = np.vstack((features, np.transpose(np.array(hred_features))))
     return features, highest_adj_queries
 
 
@@ -192,7 +192,8 @@ def next_query_prediction(sessions, experiment_string):
         print "loaded!!!!"
     else:
         for i, session in enumerate(sessions):
-            
+            if i > 2000:
+                break
             if utils.checkEqual(session):
                 bad_sess += 1
                 continue
@@ -205,7 +206,7 @@ def next_query_prediction(sessions, experiment_string):
             # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
             if target_query in highest_adj_queries and 19 < len(highest_adj_queries):
                 features, highest_adj_queries = create_features(anchor_query, session)
-                print("Session: " + str(i))
+                #print("Session: " + str(i))
                 target_vector = -1 * np.ones(len(highest_adj_queries))
                 [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
                 target_vector[target_query_index] = 1
@@ -244,6 +245,7 @@ def shorten_query(query):
 
 def make_long_tail_set(sessions, background_set, experiment_string):
     used_sess = 0
+    bad_sess = 0
     corresponding_queries = []
     if os.path.isfile('lamdamart_data_long_tail.pkl'):
         print "read pickle!"
@@ -253,10 +255,14 @@ def make_long_tail_set(sessions, background_set, experiment_string):
         print "loaded!!!!"
     else:
         for i, session in enumerate(sessions):
-            session_length = len(session)
+            if i > 2000:
+                break
+            if utils.checkEqual(session):
+                bad_sess += 1
+                continue
             # get anchor query and target query from session
-            anchor_query = session[session_length - 2]
-            target_query = session[session_length - 1]
+            anchor_query = session[-2]
+            target_query = session[-1]
             # Cannot use ADJ
             # Therefore iteratively shorten anchor query by dropping terms
             # until we have a query that appears in the Background data
@@ -264,25 +270,35 @@ def make_long_tail_set(sessions, background_set, experiment_string):
                 if anchor_query not in background_set and len(anchor_query.split()) != 1:
                     anchor_query = shorten_query(anchor_query)
                 else:
-                    features, highest_adj_queries = create_features(anchor_query, session)
-                    # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
-                    if target_query in highest_adj_queries and 19 < len(highest_adj_queries):
-                        print("Session: " + str(i))
-                        target_vector = -1 * np.ones(len(highest_adj_queries))
-                        [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
-                        target_vector[target_query_index] = 1
-                        # then add the session to the train, val, test data
-                        indexes = np.array(range(0, len(highest_adj_queries)))
-                        sess_data = np.vstack((np.transpose(target_vector), features))
-                        sess_data = np.vstack((sess_data, np.transpose(indexes)))
-                        if used_sess == 0:
-                            lambdamart_data = sess_data
-                            used_sess += 1
-                        else:
-                            lambdamart_data = np.hstack((lambdamart_data, sess_data))
-                            used_sess += 1
-                    else:
-                        continue
+                    break
+            # extract 20 queries with the highest ADJ score (most likely to follow the anchor query in the data)
+            adj_dict = adj.adj_function(anchor_query)
+            highest_adj_queries = adj_dict['adj_queries']
+            # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
+            if target_query in highest_adj_queries and 19 < len(highest_adj_queries):
+                features, highest_adj_queries = create_features(anchor_query, session)
+                #print("Session: " + str(i))
+                target_vector = -1 * np.ones(len(highest_adj_queries))
+                [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
+                target_vector[target_query_index] = 1
+                # then add the session to the train, val, test data
+                indexes = np.array(range(0, len(highest_adj_queries)))
+                sess_data = np.vstack((np.transpose(target_vector), features))
+                sess_data = np.vstack((sess_data, np.transpose(indexes)))
+                if used_sess == 0:
+                    lambdamart_data = sess_data
+                    used_sess += 1
+                else:
+                    lambdamart_data = np.hstack((lambdamart_data, sess_data))
+                    used_sess += 1
+            else:
+                bad_sess += 1
+                continue
+            if used_sess >= len(hred.features):
+                break
+            if used_sess % 1000 == 0:
+                print("[Visited %s anchor queries. %d sessions were skipped.]" % (used_sess, bad_sess))
+                pkl.dump(lambdamart_data, open('lamdamart_data_' + experiment_string + '.pkl', 'wb'))
     pkl_file = open('lamdamart_data_long_tail.pkl', 'wb')
     pkl.dump(lambdamart_data, pkl_file)
     pkl_file.close()
