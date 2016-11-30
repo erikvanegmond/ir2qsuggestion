@@ -44,6 +44,7 @@ class Model:
             outputs_info = T.zeros(self.hiddenSize))
 
         vector_rep = s_e[-1]
+        self.init_rep = vector_rep
 
         def decoder_out(y_x, prev):
             s = decoder.step(y_x, prev)
