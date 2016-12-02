@@ -319,8 +319,8 @@ def make_long_tail_set(sessions, experiment_string):
     pd.read_csv('lamdamart_data_long_tail.csv')
     print("---" * 30)
     print("used sessions:" + str(used_sess))
-    # results = lambdaMart(np.transpose(lambdamart_data), experiment_string)
-    return results, corresponding_queries
+    # lambdaMart(np.transpose(lambdamart_data), experiment_string)
+    return corresponding_queries
 
 
 def count_query_frequency(query_list):
