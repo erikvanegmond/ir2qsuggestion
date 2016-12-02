@@ -64,7 +64,7 @@ class ADJ(Ranker):
         return ADJ.cooccurrences[anchor_query]
 
     @staticmethod
-    def find_suitable_sessions(sessions_file):
+    def find_suitable_sessions():
 
         if os.path.isfile(suitable_sessions_fname):
             time = datetime.now().strftime('%d-%m %H:%M:%S')
