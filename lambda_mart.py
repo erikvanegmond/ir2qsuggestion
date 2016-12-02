@@ -22,11 +22,7 @@ import features.levenstein as levs
 if hred_use == True:
     import features.HRED as hredf
 import features.bg_count as bgcount
-import sessionizer as sn
-# import utils
 
-sessionize = sn.Sessionizer()
-sessions = sn.Sessionizer.get_sessions(sessionize)
 pkl_file = open('lm_tr_sessions.pkl', 'rb')
 sessions = pkl.load(pkl_file)
 print(sessions[1])
@@ -250,7 +246,7 @@ def next_query_prediction(sessions, experiment_string):
                     lambda_dataframe.to_csv('lamdamart_data_' + experiment_string + '.csv')
         lambdamart_data = np.transpose(lambdamart_data)
 
-    lambdaMart(np.transpose(lambdamart_data), experiment_string)
+    # lambdaMart(np.transpose(lambdamart_data), experiment_string)
     print("---" * 30)
     print("used sessions:" + str(used_sess))
     return corresponding_queries
@@ -323,7 +319,7 @@ def make_long_tail_set(sessions, experiment_string):
     pd.read_csv('lamdamart_data_long_tail.csv')
     print("---" * 30)
     print("used sessions:" + str(used_sess))
-    results = lambdaMart(np.transpose(lambdamart_data), experiment_string)
+    # results = lambdaMart(np.transpose(lambdamart_data), experiment_string)
     return results, corresponding_queries
 
 
