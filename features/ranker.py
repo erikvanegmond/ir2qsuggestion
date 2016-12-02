@@ -1,9 +1,7 @@
 from collections import defaultdict, Counter
-
 import itertools
-
-from sessionizer import Sessionizer
 import pickle as pkl
+from sessionizer import Sessionizer
 
 
 class Ranker(object):
