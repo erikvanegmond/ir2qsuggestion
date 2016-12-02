@@ -11,26 +11,34 @@ import pandas as pd
 from rankpy.models import LambdaMART
 from rankpy.queries import Queries
 
+
+hred_use = False
+
 import features.adj as ad
 import features.cossimilar as cs
 import features.length as lg
 import features.lengthdiff as ld
 import features.levenstein as levs
-import features.HRED as hredf
+if hred_use == True:
+    import features.HRED as hredf
 import features.bg_count as bgcount
 import sessionizer as sn
 # import utils
 
-hred_use = False
 sessionize = sn.Sessionizer()
 sessions = sn.Sessionizer.get_sessions(sessionize)
+pkl_file = open('lm_tr_sessions.pkl', 'rb')
+sessions = pkl.load(pkl_file)
+print(sessions[1])
+pkl_file.close()
 
 adj = ad.ADJ()
 lev = levs.Levenshtein()
 lendif = ld.LengthDiff()
 leng = lg.Length()
 coss = cs.CosineSimilarity()
-# hred = hredf.HRED()
+if hred_use == True:
+    hred = hredf.HRED()
 bgc = bgcount.BgCount()
 
 
@@ -43,9 +51,6 @@ def get_query_index_pointers(dataset):
         lower_bound += 20
     query_index_pointers = np.array(query_index_pointers)
     return query_index_pointers
-
-
-# def get_MRR():
 
 
 def lambdaMart(data, experiment_string):
@@ -93,23 +98,23 @@ def lambdaMart(data, experiment_string):
     test_pointers = test_pointers - (upper_bound_val)
     test_queries = Queries(test_features, test_targets, test_pointers)
 
-    # logging.info('================================================================================')
-    #
-    # # Print basic info about query datasets.
-    # logging.info('Train queries: %s' % training_queries)
-    # logging.info('Valid queries: %s' % validation_queries)
-    # logging.info('Test queries: %s' % test_queries)
-    #
-    # logging.info('================================================================================')
-    #
-    # model = LambdaMART(metric='nDCG@20', n_estimators=500, subsample=0.5)
-    # logging.info("model is made")
-    # model.fit(training_queries, validation_queries=validation_queries)
-    #
-    # logging.info('================================================================================')
-    #
-    # logging.info('%s on the test queries: %.8f'
-    #              % (model.metric, model.evaluate(test_queries, n_jobs=-1)))
+    logging.info('================================================================================')
+
+    # Print basic info about query datasets.
+    logging.info('Train queries: %s' % training_queries)
+    logging.info('Valid queries: %s' % validation_queries)
+    logging.info('Test queries: %s' % test_queries)
+
+    logging.info('================================================================================')
+
+    model = LambdaMART(metric='nDCG@20', n_estimators=500, subsample=0.5)
+    logging.info("model is made")
+    model.fit(training_queries, validation_queries=validation_queries)
+
+    logging.info('================================================================================')
+
+    logging.info('%s on the test queries: %.8f'
+                 % (model.metric, model.evaluate(test_queries, n_jobs=-1)))
 
     test_set = data[upper_bound_val:, :]
     test_set_length = test_set.shape[0]
@@ -144,7 +149,8 @@ def create_features(anchor_query, session):
     highest_adj_queries = adj_dict['adj_queries']
     sugg_features = adj_dict['absfreq']
     bgcount_features = bgc.calculate_feature(anchor_query, highest_adj_queries)
-    #hred_features = hred.calculate_feature(anchor_query, highest_adj_queries)
+    if hred_use == True:
+        hred_features = hred.calculate_feature(anchor_query, highest_adj_queries)
     for query in highest_adj_queries:
         if session_length > 11:
             # Take the features of the 10 most recent queries (contextual features)
@@ -175,8 +181,8 @@ def create_features(anchor_query, session):
     features = np.vstack((features, np.transpose(np.array(lendif_features))))
     features = np.vstack((features, np.transpose(np.array(leng_features))))
     features = np.vstack((features, np.transpose(np.array(coss_features))))
-    # features = np.vstack((features, np.transpose(np.array(hred_features))))
-
+    if hred_use == True:
+        features = np.vstack((features, np.transpose(np.array(hred_features))))
     return features, highest_adj_queries
 
 
@@ -200,23 +206,17 @@ def next_query_prediction(sessions, experiment_string):
     used_sess = 0
     bad_sess = 0
     corresponding_queries = []
-    if os.path.isfile('lamdamart_data_' + experiment_string + '.csv'):
+    if os.path.isfile('lamdamart_data_next_query.csv'):
         print "read csv!"
-        # pkl_file = open('lamdamart_data_' + experiment_string + '.pkl', 'rb')
-        df = pd.read_csv('lamdamart_data_' + experiment_string + '.csv', index=False)
-        print(df)
-        lambdamart_data = df.get_values()
-        # pkl_file.close()
+        df = pd.read_csv('lamdamart_data_next_query.csv')
+        df.drop('Unnamed: 0', 1)
+        lambdamart_data = df.get_values()[:, 1:]
         print "loaded!!!!"
-        lambdaMart(lambdamart_data, experiment_string)
+        # lambdaMart(lambdamart_data, experiment_string)
     else:
         headers = create_dataframe_headers()
         for i, session in enumerate(sessions):
             if i < 200:
-                # if utils.checkEqual(session):
-                #     bad_sess += 1
-                #     continue
-                # get anchor query and target query from session
                 anchor_query = session[-2]
                 target_query = session[-1]
                 # extract 20 queries with the highest ADJ score (most likely to follow the anchor query in the data)
@@ -240,18 +240,15 @@ def next_query_prediction(sessions, experiment_string):
                 else:
                     bad_sess += 1
                     continue
-                # if used_sess == len(hred.features):
-                #     break
-                # if used_sess % 100 == 0:
-                if i % 104 == 0:
+                if hred_use == True:
+                    if used_sess == len(hred.features):
+                        break
+                if used_sess % 100 == 0:
                     lambda_dataframe = pd.DataFrame(data=np.transpose(lambdamart_data), columns=headers)
                     print("[Visited %s anchor queries. %d sessions were skipped.]" % (used_sess, bad_sess))
                     # pkl.dump(lambdamart_data, open('lamdamart_data_' + experiment_string + '.pkl', 'wb'))
                     lambda_dataframe.to_csv('lamdamart_data_' + experiment_string + '.csv')
-                
-        # pkl_file = open('lamdamart_data_' + experiment_string + '.pkl', 'wb')
-        # pkl.dump(lambdamart_data, pkl_file)
-        # pkl_file.close()
+        lambdamart_data = np.transpose(lambdamart_data)
 
     lambdaMart(np.transpose(lambdamart_data), experiment_string)
     print("---" * 30)
@@ -264,17 +261,15 @@ def shorten_query(query):
     return query
 
 
-def make_long_tail_set(sessions, background_set, experiment_string):
+def make_long_tail_set(sessions, experiment_string):
     used_sess = 0
     bad_sess = 0
     corresponding_queries = []
-    if os.path.isfile('lamdamart_data_long_tail.csv'):
+    if os.path.isfile('lamdamart_data_next_query.csv'):
         print "read csv!"
-        # pkl_file = open('lamdamart_data_' + experiment_string + '.pkl', 'rb')
-        df = pd.read_csv('lamdamart_data_long_tail.csv')
-        print(df)
-        lambdamart_data = df.get_values()
-        # pkl_file.close()
+        df = pd.read_csv('lamdamart_data_next_query.csv')
+        df.drop('Unnamed: 0', 1)
+        lambdamart_data = df.get_values()[:, 1:]
         print "loaded!!!!"
     else:
         headers = create_dataframe_headers()
@@ -301,7 +296,7 @@ def make_long_tail_set(sessions, background_set, experiment_string):
                 features, highest_adj_queries = create_features(anchor_query, session)
                 # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
                 if target_query in highest_adj_queries and 19 < len(highest_adj_queries):
-                    # print("Session: " + str(i))
+                    print("Session: " + str(i))
                     target_vector = -1 * np.ones(len(highest_adj_queries))
                     [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
                     target_vector[target_query_index] = 1
@@ -317,16 +312,14 @@ def make_long_tail_set(sessions, background_set, experiment_string):
                 else:
                     bad_sess += 1
                     continue
-                # if used_sess == len(hred.features):
-                #     break
+                if hred_use == True:
+                    if used_sess == len(hred.features):
+                        break
                 if used_sess % 1000 == 0:
                     lambda_dataframe = pd.DataFrame(data=np.transpose(lambdamart_data), columns=headers)
                     print("[Visited %s anchor queries. %d sessions were skipped.]" % (used_sess, bad_sess))
                     lambda_dataframe.to_csv('lamdamart_data_' + experiment_string + '.csv')
-
-    # pkl_file = open('lamdamart_data_long_tail.pkl', 'wb')
-    # pkl.dump(lambdamart_data, pkl_file)
-    # pkl_file.close()
+        lambdamart_data = np.transpose(lambdamart_data)
     pd.read_csv('lamdamart_data_long_tail.csv')
     print("---" * 30)
     print("used sessions:" + str(used_sess))
@@ -386,7 +379,7 @@ for i, session in enumerate(sessions):
 experiment_string = "noisy"
 print("Performing experiment: " + experiment_string)
 noisy_query_sessions = noisy_query_prediction(sessions, background_set)
-data_noisy, corresponding_queries = next_query_prediction(noisy_query_sessions, experiment_string)
+corresponding_queries_noisy = next_query_prediction(noisy_query_sessions, experiment_string)
 print("---" * 30)
 
 # 3 Long-TailPrediction (when the anchor is not present in the background data)
@@ -395,5 +388,5 @@ print("---" * 30)
 
 experiment_string = "long_tail"
 print("Performing experiment: " + experiment_string)
-data_long_tail = make_long_tail_set(sessions, background_set, experiment_string)
+corresponding_queries_lt = make_long_tail_set(sessions, experiment_string)
 print("---" * 30)
