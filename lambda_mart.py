@@ -144,7 +144,7 @@ def create_features(anchor_query, session):
     highest_adj_queries = adj_dict['adj_queries']
     sugg_features = adj_dict['absfreq']
     bgcount_features = bgc.calculate_feature(anchor_query, highest_adj_queries)
-    # hred_features = hred.calculate_feature(anchor_query, highest_adj_queries)
+    #hred_features = hred.calculate_feature(anchor_query, highest_adj_queries)
     for query in highest_adj_queries:
         if session_length > 11:
             # Take the features of the 10 most recent queries (contextual features)
@@ -176,6 +176,7 @@ def create_features(anchor_query, session):
     features = np.vstack((features, np.transpose(np.array(leng_features))))
     features = np.vstack((features, np.transpose(np.array(coss_features))))
     # features = np.vstack((features, np.transpose(np.array(hred_features))))
+
     return features, highest_adj_queries
 
 

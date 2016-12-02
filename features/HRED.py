@@ -1,6 +1,7 @@
 import cPickle as pickle
 from features.feature import Feature
 
+
 class DatasetFeature(Feature):
     features = {}
 
@@ -10,8 +11,8 @@ class DatasetFeature(Feature):
         else:
             print "Features already loaded."
 
-class HRED(DatasetFeature):
 
+class HRED(DatasetFeature):
     @staticmethod
     def calculate_feature(compared_query, queries):
         fts = []

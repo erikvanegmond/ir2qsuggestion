@@ -1,16 +1,54 @@
-from collections import Counter
-from collections import defaultdict
+import os
+from collections import defaultdict, Counter
+from features.ranker import Ranker
+import cPickle as pkl
+from datetime import datetime
+import utils
 
-from ranker import Ranker
-from sessionizer import Sessionizer
-import numpy as np
+suitable_sessions_fname = "../data/lm_tr_sessions.pkl"
 
 
 class ADJ(Ranker):
+    suitable_sessions = []
+    bg_info = defaultdict(Counter)
+
+    def __init__(self):
+        super(ADJ, self).__init__()
+        if not ADJ.bg_info:
+            info_path = '../data/bg_info.pkl'
+            if os.path.isfile(info_path):
+                time = datetime.now().strftime('%d-%m %H:%M:%S')
+                print("[%s: Loading %d...]" % (time, info_path))
+                with open(info_path, 'rb') as pkl_file:
+                    ADJ.bg_info = pkl.load(pkl_file)
+                time = datetime.now().strftime('%d-%m %H:%M:%S')
+                print("[%s: Loaded %d sessions...]" % (time, len(ADJ.bg_info)))
+            else:
+                time = datetime.now().strftime('%d-%m %H:%M:%S')
+                print("[%s: Creating co-occurrence info...]" % time)
+                s = 0
+                q = 0
+                for session in ADJ.bg_sessions:
+                    # Every query should add +1 for the other queries
+                    for anchor_query in set(session):
+                        q += 1
+                        anchor_occurrence = [i for i, x in enumerate(session) if anchor_query == x]
+                        for i in anchor_occurrence:
+                            if i < len(session) - 1:
+                                ADJ.bg_info[anchor_query].update([session[i + 1]])
+                    s += 1
+                    if s % 100 == 0:
+                        print("[%s sessions, %d queries]" % (s, q))
+                        with open(info_path, 'wb') as pkl_file:
+                            pkl.dump(ADJ.bg_info, pkl_file)
+        else:
+            time = datetime.now().strftime('%d-%m %H:%M:%S')
+            print("[%s: Background info is already loaded.]" % time)
+
     @staticmethod
     def adj_function(anchor_query):
-        # if anchor_query in ADJ.cooccurrences:
-        #     return ADJ.cooccurrences[anchor_query]
+        if anchor_query in ADJ.cooccurrences and 'adj_queries' in ADJ.cooccurrences[anchor_query]:
+            return ADJ.cooccurrences[anchor_query]
 
         cooccurrence_list = Counter()
         for session in ADJ.bg_sessions:
@@ -30,3 +68,38 @@ class ADJ(Ranker):
         ADJ.cooccurrences[anchor_query].update({'adj_queries': top20_queries, 'absfreq': top20_absfreq,
                                                 'relfreq': top20_relfreq})
         return ADJ.cooccurrences[anchor_query]
+
+    @staticmethod
+    def find_suitable_sessions(sessions_file):
+
+        if os.path.isfile(suitable_sessions_fname):
+            time = datetime.now().strftime('%d-%m %H:%M:%S')
+            print("[%s: Loading %d...]" % (time, suitable_sessions_fname))
+            with open(suitable_sessions_fname, 'rb') as pkl_file:
+                ADJ.suitable_sessions = pkl.load(pkl_file)
+            time = datetime.now().strftime('%d-%m %H:%M:%S')
+            print("[%s: Loaded %d sessions...]" % (time, len(ADJ.suitable_sessions)))
+            return ADJ.suitable_sessions
+
+        time = datetime.now().strftime('%d-%m %H:%M:%S')
+        print("[%s: Removing sessions with one type query...]" % time)
+        ADJ.suitable_sessions = [session for session in ADJ.sessions if not utils.checkEqual(session)]
+        
+        
+        ADJ.suitable_sessions = []
+        l = float(len(ADJ.sessions))
+        for i, session in enumerate(ADJ.sessions):
+            anchor_query = session[-2]
+            target_query = session[-1]
+            adj_dict = ADJ.adj_function(anchor_query)
+            highest_adj_queries = adj_dict['adj_queries']
+            if target_query in highest_adj_queries and 19 < len(highest_adj_queries):
+                ADJ.suitable_sessions.append(session)
+
+            if i % 120 == 0:
+                print 'checked session {}, at {}%'.format(i, i / l)
+
+        pkl_file = open(suitable_sessions_fname, 'wb')
+        pkl.dump(ADJ.suitable_sessions, pkl_file)
+        pkl_file.close()
+        return ADJ.suitable_sessions
