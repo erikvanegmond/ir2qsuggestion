@@ -1,13 +1,16 @@
 from features.adj import ADJ
-import time
+from features.ranker import Ranker
+from datetime import datetime
 
-start = time.time()
-print "adj:"
+start = datetime.now()
+time = start.strftime('%d-%m %H:%M:%S')
+print('[%s: Creating ADJ...]' % time)
+ranker = Ranker(train_sessions_file='../data/val_session')
 adj = ADJ()
-print time.time() - start
+print('[It took %s seconds.]' % (start - datetime.now()).seconds)
 
-
-#start = time.time()
-#print "finding:",
-#adj.find_suitable_sessions()
-#print time.time() - start
+start = datetime.now()
+time = start.strftime('%d-%m %H:%M:%S')
+print('[%s: Searching for suitable train queries...]' % time)
+adj.find_suitable_sessions()
+print('[It took %s seconds.]' % (start - datetime.now()).seconds)

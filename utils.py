@@ -1,7 +1,6 @@
 import cPickle as pickle
 import numpy as np
 import features.adj as adj
-import features.ranker as ranker
 from datetime import datetime
 from model.model import Model
 from sessionizer import Sessionizer

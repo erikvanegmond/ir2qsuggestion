@@ -3,7 +3,7 @@ from collections import defaultdict, Counter
 from features.ranker import Ranker
 import cPickle as pkl
 from datetime import datetime
-import utils
+import numpy as np
 
 suitable_sessions_fname = "../data/lm_tr_sessions.pkl"
 
@@ -18,7 +18,7 @@ class ADJ(Ranker):
             info_path = '../data/bg_info.pkl'
             if os.path.isfile(info_path):
                 time = datetime.now().strftime('%d-%m %H:%M:%S')
-                print("[%s: Loading %d...]" % (time, info_path))
+                print("[%s: Loading bg_info.pkl...]" % time)
                 with open(info_path, 'rb') as pkl_file:
                     ADJ.bg_info = pkl.load(pkl_file)
                 time = datetime.now().strftime('%d-%m %H:%M:%S')
@@ -37,10 +37,12 @@ class ADJ(Ranker):
                             if i < len(session) - 1:
                                 ADJ.bg_info[anchor_query].update([session[i + 1]])
                     s += 1
-                    if s % 100 == 0:
+                    if s % 10000 == 0:
                         print("[%s sessions, %d queries]" % (s, q))
-                        with open(info_path, 'wb') as pkl_file:
-                            pkl.dump(ADJ.bg_info, pkl_file)
+                time = datetime.now().strftime('%d-%m %H:%M:%S')
+                print("[%s: Saving %d sessions...]" % (time, len(ADJ.bg_info)))
+                with open(info_path, 'wb') as pkl_file:
+                    pkl.dump(ADJ.bg_info, pkl_file)
         else:
             time = datetime.now().strftime('%d-%m %H:%M:%S')
             print("[%s: Background info is already loaded.]" % time)
@@ -50,15 +52,7 @@ class ADJ(Ranker):
         if anchor_query in ADJ.cooccurrences and 'adj_queries' in ADJ.cooccurrences[anchor_query]:
             return ADJ.cooccurrences[anchor_query]
 
-        cooccurrence_list = Counter()
-        for session in ADJ.bg_sessions:
-            if anchor_query in session:
-                anchor_occurrence = [i for i, x in enumerate(session) if anchor_query == x]
-                for i in anchor_occurrence:
-                    if i < len(session) - 1:
-                        cooccurrence_list.update([session[i + 1]])
-
-        top20 = cooccurrence_list.most_common(20)
+        top20 = ADJ.bg_info[anchor_query].most_common(20)
         top20_queries = [x for x, y in top20]
 
         tot = sum([y for x, y in top20])
@@ -70,7 +64,7 @@ class ADJ(Ranker):
         return ADJ.cooccurrences[anchor_query]
 
     @staticmethod
-    def find_suitable_sessions(sessions_file):
+    def find_suitable_sessions():
 
         if os.path.isfile(suitable_sessions_fname):
             time = datetime.now().strftime('%d-%m %H:%M:%S')
@@ -82,10 +76,7 @@ class ADJ(Ranker):
             return ADJ.suitable_sessions
 
         time = datetime.now().strftime('%d-%m %H:%M:%S')
-        print("[%s: Removing sessions with one type query...]" % time)
-        ADJ.suitable_sessions = [session for session in ADJ.sessions if not utils.checkEqual(session)]
-        
-        
+        print("[%s: Creating suitable sessions...]" % time)
         ADJ.suitable_sessions = []
         l = float(len(ADJ.sessions))
         for i, session in enumerate(ADJ.sessions):
@@ -97,7 +88,7 @@ class ADJ(Ranker):
                 ADJ.suitable_sessions.append(session)
 
             if i % 120 == 0:
-                print 'checked session {}, at {}%'.format(i, i / l)
+                print 'checked session {}, at {}%'.format(i, np.round(i / l * 100))
 
         pkl_file = open(suitable_sessions_fname, 'wb')
         pkl.dump(ADJ.suitable_sessions, pkl_file)
