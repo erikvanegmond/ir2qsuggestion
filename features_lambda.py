@@ -1,5 +1,9 @@
 import cPickle
 import numpy as np
+import pandas as pd
+import features.HRED as hredf
+import cPickle as pkl
+import features.adj as ad
 
 def getFeatures(m, anchor, suggestions):
     initial = m.init_rep
@@ -23,3 +27,17 @@ def aug_data(data):
         auged_data.append(tmp.astype(np.int32))
     return auged_data
 
+def next_query_HRED_features():
+    hred = hredf.HRED()
+    adj = ad.ADJ()
+    pkl_file = open('../data/lm_tr_sessions.pkl', 'rb')
+    sessions = pkl.load(pkl_file)
+    df = pd.read_csv('../data/lamdamart_data_next_query.csv')
+    df['HRED'] = pd.Series(np.zeros(len(df)), index=df.index)
+    for i in range(len(sessions)):
+        session = sessions[i]
+        anchor_query = session[-2]
+        adj_dict = adj.adj_function(anchor_query)
+        highest_adj_queries = adj_dict['adj_queries']
+        hred_feats = hred.calculate_feature(anchor_query, highest_adj_queries)
+        df['HRED'][i:i+len(highest_adj_queries)] = hred_feats
