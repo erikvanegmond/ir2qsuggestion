@@ -39,5 +39,5 @@ class HRED(DatasetFeature):
                 DatasetFeature.features[compared_query][q] = likelihood
                 fts.append(DatasetFeature.features[compared_query][q])
                 
-        Feature.cooccurrences[compared_query]['HRED'] = fts
+        HRED.cooccurrences[compared_query]['HRED'] = fts
         return fts

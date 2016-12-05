@@ -11,8 +11,7 @@ import pandas as pd
 from rankpy.models import LambdaMART
 from rankpy.queries import Queries
 
-
-hred_use = False
+hred_use = True
 
 import features.adj as ad
 import features.cossimilar as cs
@@ -29,6 +28,7 @@ print(sessions[1])
 pkl_file.close()
 
 adj = ad.ADJ()
+adj.find_suitable_sessions()
 lev = levs.Levenshtein()
 lendif = ld.LengthDiff()
 leng = lg.Length()
@@ -212,38 +212,32 @@ def next_query_prediction(sessions, experiment_string):
     else:
         headers = create_dataframe_headers()
         for i, session in enumerate(sessions):
-            if i < 200:
-                anchor_query = session[-2]
-                target_query = session[-1]
-                # extract 20 queries with the highest ADJ score (most likely to follow the anchor query in the data)
-                adj_dict = adj.adj_function(anchor_query)
-                highest_adj_queries = adj_dict['adj_queries']
-                # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
-                if target_query in highest_adj_queries and 19 < len(highest_adj_queries):
-                    features, highest_adj_queries = create_features(anchor_query, session)
-                    print("Session: " + str(i))
-                    target_vector = -1 * np.ones(len(highest_adj_queries))
-                    [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
-                    target_vector[target_query_index] = 1
-                    # then add the session to the train, val, test data
-                    sess_data = np.vstack((np.transpose(target_vector), features))
-                    if used_sess == 0:
-                        lambdamart_data = sess_data
-                        used_sess += 1
-                    else:
-                        lambdamart_data = np.hstack((lambdamart_data, sess_data))
-                        used_sess += 1
-                else:
-                    bad_sess += 1
-                    continue
-                if hred_use == True:
-                    if used_sess == len(hred.features):
-                        break
-                if used_sess % 100 == 0:
-                    lambda_dataframe = pd.DataFrame(data=np.transpose(lambdamart_data), columns=headers)
-                    print("[Visited %s anchor queries. %d sessions were skipped.]" % (used_sess, bad_sess))
-                    # pkl.dump(lambdamart_data, open('lamdamart_data_' + experiment_string + '.pkl', 'wb'))
-                    lambda_dataframe.to_csv('lamdamart_data_' + experiment_string + '.csv')
+            anchor_query = session[-2]
+            target_query = session[-1]
+            # extract 20 queries with the highest ADJ score (most likely to follow the anchor query in the data)
+            adj_dict = adj.adj_function(anchor_query)
+            highest_adj_queries = adj_dict['adj_queries']
+            # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
+            features, highest_adj_queries = create_features(anchor_query, session)
+            target_vector = -1 * np.ones(len(highest_adj_queries))
+            [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
+            target_vector[target_query_index] = 1
+            # then add the session to the train, val, test data
+            sess_data = np.vstack((np.transpose(target_vector), features))
+            if used_sess == 0:
+                lambdamart_data = sess_data
+                used_sess += 1
+            else:
+                lambdamart_data = np.hstack((lambdamart_data, sess_data))
+                used_sess += 1
+            if hred_use == True:
+                if used_sess == len(hred.features):
+                    break
+            if used_sess % 100 == 0:
+                lambda_dataframe = pd.DataFrame(data=np.transpose(lambdamart_data), columns=headers)
+                print("[Visited %s anchor queries. %d sessions were skipped.]" % (used_sess, bad_sess))
+                # pkl.dump(lambdamart_data, open('lamdamart_data_' + experiment_string + '.pkl', 'wb'))
+                lambda_dataframe.to_csv('lamdamart_data_' + experiment_string + '.csv')
         lambdamart_data = np.transpose(lambdamart_data)
 
     # lambdaMart(np.transpose(lambdamart_data), experiment_string)
