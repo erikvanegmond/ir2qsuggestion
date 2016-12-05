@@ -85,9 +85,10 @@ def create_feature_data():
     
     start_time = datetime.now()
     time = start_time.strftime('%d-%m %H:%M:%S')
-    print("[%s: Loading sessions...]" % time)
-    sessionize = Sessionizer()
-    sessions = sessionize.get_sessions()
+    print("[%s: Loading sessions lm_tr_sessions.pkl]" % time)
+    pkl_file = open('../data/lm_tr_sessions.pkl', 'rb')
+    sessions = pickle.load(pkl_file)
+    pkl_file.close()
     print("[Loaded %s test sessions. It took %f seconds.]" % (len(sessions), (datetime.now() - start_time).seconds))
     
     word2index = pickle.load( open( "../data/word2index.p", "rb" ) )
@@ -106,29 +107,20 @@ def create_feature_data():
     time = start_time.strftime('%d-%m %H:%M:%S')
     print("[%s: Creating features...]" % time)
     for session in sessions:
-        # We only want queries with different queries
-        if not checkEqual(session):
-            # Get the anchor queries
-            anchor_query = session[-2]
-            adj_dict = ADJ.adj_function(anchor_query)
-            highest_adj_queries = adj_dict['adj_queries']
-            # We only use the session if the correct query is in the 20 most occurring ones
-            if session[-1] in highest_adj_queries:
-                features[anchor_query] = {}
-                # Calculate the likelihood between the queries
-                for sug_query in highest_adj_queries:
-                    num_anchor_query = vectorify(anchor_query, word2index)
-                    num_sug_query = vectorify(sug_query, word2index)                    
-                    likelihood = m.likelihood(num_anchor_query, num_sug_query)
-                    features[anchor_query][sug_query] = likelihood
-                queries += 1                
-            else:
-                bad_sessions += 1
-        else:
-            bad_sessions += 1
-        if queries % 100 == 0:
+        # Get the anchor queries
+        anchor_query = session[-2]
+        adj_dict = ADJ.adj_function(anchor_query)
+        highest_adj_queries = adj_dict['adj_queries']
+        features[anchor_query] = {}
+        # Calculate the likelihood between the queries
+        for sug_query in highest_adj_queries:
+            num_anchor_query = vectorify(anchor_query, word2index)
+            num_sug_query = vectorify(sug_query, word2index)                    
+            likelihood = m.likelihood(num_anchor_query, num_sug_query)
+            features[anchor_query][sug_query] = likelihood
+        queries += 1
+        if queries % 10000 == 0:
             print("[Visited %s anchor queries. %d sessions were skipped.]" % (queries, bad_sessions))
-            pickle.dump(features, open('../data/HRED_features.pkl', 'wb'))
     print("[Saving features %s features.]" % (len(features)))
     pickle.dump(features, open('../data/HRED_features.pkl', 'wb'))
     print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))

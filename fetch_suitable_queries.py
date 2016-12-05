@@ -5,7 +5,7 @@ from datetime import datetime
 start = datetime.now()
 time = start.strftime('%d-%m %H:%M:%S')
 print('[%s: Creating ADJ...]' % time)
-ranker = Ranker(train_sessions_file='../data/val_session')
+ranker = Ranker(train_sessions_file='../data/test_session')
 adj = ADJ()
 print('[It took %s seconds.]' % (start - datetime.now()).seconds)
 
