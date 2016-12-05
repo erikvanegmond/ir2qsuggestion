@@ -5,6 +5,8 @@ from datetime import datetime
 from model.model import Model
 from sessionizer import Sessionizer
 
+word2index = pickle.load( open( "../data/word2index.p", "rb" ) )
+
 def create_word_mappings():
     print 'Loading aol_vocab.dict.pkl...'
     vocab = pickle.load(open('../data/aol_vocab.dict.pkl', 'rb'))
@@ -68,7 +70,7 @@ def checkEqual(iterator):
         return True
     return all(first == rest for rest in iterator)
     
-def vectorify(string, word2index):
+def vectorify(string):
     vect = []
     for words in string.split():
         try:
@@ -91,8 +93,6 @@ def create_feature_data():
     pkl_file.close()
     print("[Loaded %s test sessions. It took %f seconds.]" % (len(sessions), (datetime.now() - start_time).seconds))
     
-    word2index = pickle.load( open( "../data/word2index.p", "rb" ) )
-    
     start_time = datetime.now()
     time = start_time.strftime('%d-%m %H:%M:%S')
     print("[%s: Loading model...]" % time)
@@ -114,8 +114,8 @@ def create_feature_data():
         features[anchor_query] = {}
         # Calculate the likelihood between the queries
         for sug_query in highest_adj_queries:
-            num_anchor_query = vectorify(anchor_query, word2index)
-            num_sug_query = vectorify(sug_query, word2index)                    
+            num_anchor_query = vectorify(anchor_query)
+            num_sug_query = vectorify(sug_query)                    
             likelihood = m.likelihood(num_anchor_query, num_sug_query)
             features[anchor_query][sug_query] = likelihood
         queries += 1
