@@ -62,7 +62,7 @@ class ADJ(Ranker):
 
     @staticmethod
     def find_suitable_sessions():
-        suitable_sessions_fname = "../data/lm_test_sessions.pkl"
+        suitable_sessions_fname = "../data/lm_train_sessions.pkl"
         if os.path.isfile(suitable_sessions_fname):
             time = datetime.now().strftime('%d-%m %H:%M:%S')
             print("[%s: Loading lm_val_sessions.pkl...]" % time)
@@ -87,7 +87,7 @@ class ADJ(Ranker):
             if i % 120 == 0:
                 print 'checked session {}, at {}%'.format(i, np.round(i / l * 100))
         time = datetime.now().strftime('%d-%m %H:%M:%S')
-        print("[%s: Saving file lm_test_sessions.pkl...]" % time)
+        print("[%s: Saving file lm_train_sessions.pkl...]" % time)
         pkl_file = open(suitable_sessions_fname, 'wb')
         pkl.dump(ADJ.suitable_sessions, pkl_file)
         pkl_file.close()

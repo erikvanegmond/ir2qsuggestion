@@ -1,8 +1,6 @@
 import cPickle
 import numpy as np
-import pandas as pd
-import features.HRED as hredf
-import cPickle as pkl
+import lambda_mart as lm
 import features.adj as ad
 
 def getFeatures(m, anchor, suggestions):
@@ -26,18 +24,55 @@ def aug_data(data):
                         word2index['</q>'])
         auged_data.append(tmp.astype(np.int32))
     return auged_data
+    
+adj = ad.ADJ()
+sessions = adj.find_suitable_sessions()
 
-def next_query_HRED_features():
-    hred = hredf.HRED()
-    adj = ad.ADJ()
-    pkl_file = open('../data/lm_tr_sessions.pkl', 'rb')
-    sessions = pkl.load(pkl_file)
-    df = pd.read_csv('../data/lamdamart_data_next_query.csv')
-    df['HRED'] = pd.Series(np.zeros(len(df)), index=df.index)
-    for i in range(len(sessions)):
-        session = sessions[i]
-        anchor_query = session[-2]
-        adj_dict = adj.adj_function(anchor_query)
-        highest_adj_queries = adj_dict['adj_queries']
-        hred_feats = hred.calculate_feature(anchor_query, highest_adj_queries)
-        df['HRED'][i:i+len(highest_adj_queries)] = hred_feats
+# Do LambdaMart for 3 different scenario's
+# 1 Next-QueryPrediction (when anchor query exists in background data)
+# for each session:
+def create_next_query_csv():
+    print('[Creating dataset for next_query predictions.]')
+    experiment_string = "next_query"
+    print("Performing experiment: " + experiment_string)
+    corresponding_queries = lm.next_query_prediction(sessions, experiment_string)
+    print("---" * 30)
+
+## 2 RobustPrediction (when the context is perturbed with overly common queries)
+## label 100 most frequent queries in the background set as noisy
+def create_noisy_query_csv():
+    for i, session in enumerate(sessions):
+        if i == 0:
+            background_set = session
+        else:
+            background_set += session
+
+    experiment_string = "noisy"
+    print("Performing experiment: " + experiment_string)
+    noisy_query_sessions = lm.noisy_query_prediction(sessions, background_set)
+    corresponding_queries_noisy = lm.next_query_prediction(noisy_query_sessions, experiment_string)
+    print("---" * 30)
+
+# 3 Long-TailPrediction (when the anchor is not present in the background data)
+# train, val and test set retain sessions for which the anchor query has not been
+# seen in the background set (long-tail query)
+def create_longtail_query_csv():
+    experiment_string = "long_tail"
+    print("Performing experiment: " + experiment_string)
+    corresponding_queries_lt = lm.make_long_tail_set(sessions, experiment_string)
+    print("---" * 30)
+
+#def next_query_HRED_features():
+#    hred = hredf.HRED()
+#    adj = ad.ADJ()
+#    pkl_file = open('../data/lm_tr_sessions.pkl', 'rb')
+#    sessions = pkl.load(pkl_file)
+#    df = pd.read_csv('../data/lamdamart_data_next_query.csv')
+#    df['HRED'] = pd.Series(np.zeros(len(df)), index=df.index)
+#    for i in range(len(sessions)):
+#        session = sessions[i]
+#        anchor_query = session[-2]
+#        adj_dict = adj.adj_function(anchor_query)
+#        highest_adj_queries = adj_dict['adj_queries']
+#        hred_feats = hred.calculate_feature(anchor_query, highest_adj_queries)
+#        df['HRED'][i:i+len(highest_adj_queries)] = hred_feats

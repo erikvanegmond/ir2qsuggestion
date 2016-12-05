@@ -1,5 +1,5 @@
 import cPickle as pickle
-from model import Model
+from model.model import Model
 from features.feature import Feature
 import utils
 

@@ -22,13 +22,8 @@ if hred_use == True:
     import features.HRED as hredf
 import features.bg_count as bgcount
 
-pkl_file = open('../data/lm_tr_sessions.pkl', 'rb')
-sessions = pkl.load(pkl_file)
-print(sessions[1])
-pkl_file.close()
-
-adj = ad.ADJ()
-adj.find_suitable_sessions()
+#adj = ad.ADJ()
+#sessions = adj.find_suitable_sessions()
 lev = levs.Levenshtein()
 lendif = ld.LengthDiff()
 leng = lg.Length()
@@ -202,7 +197,6 @@ def create_dataframe_headers():
 
 def next_query_prediction(sessions, experiment_string):
     used_sess = 0
-    bad_sess = 0
     corresponding_queries = []
     if os.path.isfile('lamdamart_data_next_query.csv'):
         print "read csv!"
@@ -218,28 +212,23 @@ def next_query_prediction(sessions, experiment_string):
             target_query = session[-1]
             # extract 20 queries with the highest ADJ score (most likely to follow the anchor query in the data)
             adj_dict = adj.adj_function(anchor_query)
-            highest_adj_queries = adj_dict['adj_queries']             # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
-            if target_query in highest_adj_queries and 19 < len(highest_adj_queries):
-                features, highest_adj_queries = create_features(anchor_query, session)
-                print("Session: " + str(i))
-                target_vector = -1 * np.ones(len(highest_adj_queries))
-                [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
-                target_vector[target_query_index] = 1
-                # then add the session to the train, val, test data
-                sess_data = np.vstack((np.transpose(target_vector), features))
-                if used_sess == 0:
-               	    lambdamart_data = sess_data
+            highest_adj_queries = adj_dict['adj_queries']
+            features, highest_adj_queries = create_features(anchor_query, session)
+            target_vector = -1 * np.ones(len(highest_adj_queries))
+            [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
+            target_vector[target_query_index] = 1
+            # then add the session to the train, val, test data
+            sess_data = np.vstack((np.transpose(target_vector), features))
+            if used_sess == 0:
+           	    lambdamart_data = sess_data
 		    used_sess += 1
-                else:
-                    lambdamart_data = np.hstack((lambdamart_data, sess_data))
-                    used_sess += 1
             else:
-                bad_sess += 1
-                continue
-            if used_sess % 100 == 0:
-                lambda_dataframe = pd.DataFrame(data=np.transpose(lambdamart_data), columns=headers)
-                print("[Visited %s anchor queries. %d sessions were skipped.]" % (used_sess, bad_sess))
-                lambda_dataframe.to_csv('../data/lamdamart_data_' + experiment_string + '.csv')
+                lambdamart_data = np.hstack((lambdamart_data, sess_data))
+                used_sess += 1
+            if used_sess % 1000 == 0:
+                print("[Visited %s anchor queries.]" % used_sess)
+        lambda_dataframe = pd.DataFrame(data=np.transpose(lambdamart_data), columns=headers)
+        lambda_dataframe.to_csv('../data/lamdamart_data_' + experiment_string + '.csv')
         lambdamart_data = np.transpose(lambdamart_data)
 
     # lambdaMart(np.transpose(lambdamart_data), experiment_string)
@@ -265,50 +254,38 @@ def make_long_tail_set(sessions, experiment_string):
         print "loaded!!!!"
     else:
         headers = create_dataframe_headers()
-        for i, session in enumerate(sessions):
-            print("Session: " + str(i))
-            session_length = len(session)
+        for session in sessions:
             # get anchor query and target query from session
-            anchor_query = session[session_length - 2]
-            target_query = session[session_length - 1]
+            anchor_query = session[-2]
+            target_query = session[-1]
             # Cannot use ADJ
             # Therefore iteratively shorten anchor query by dropping terms
             # until we have a query that appears in the Background data
             for j in range(len(anchor_query.split())):
-                print(j)
-                print(len(anchor_query.split()))
                 [background_count] = bgc.calculate_feature(None, [anchor_query])
-                print(background_count)
-                if background_count == 0 and len(anchor_query.split()) != 1:
+                
+                if background_count == 0 and len(anchor_query.split()) > 1:
                     print("shortened")
                     anchor_query = shorten_query(anchor_query)
                 else:
                     break
             features, highest_adj_queries = create_features(anchor_query, session)
             # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
-            if target_query in highest_adj_queries and 19 < len(highest_adj_queries):
-                print("Session: " + str(i))
-                target_vector = -1 * np.ones(len(highest_adj_queries))
-                [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
-                target_vector[target_query_index] = 1
-                # then add the session to the train, val, test data
-                sess_data = np.vstack((np.transpose(target_vector), features))
-                if used_sess == 0:
-                    lambdamart_data = sess_data
-                    used_sess += 1
-                else:
-                    lambdamart_data = np.hstack((lambdamart_data, sess_data))
-                    used_sess += 1
+            target_vector = -1 * np.ones(len(highest_adj_queries))
+            [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
+            target_vector[target_query_index] = 1
+            # then add the session to the train, val, test data
+            sess_data = np.vstack((np.transpose(target_vector), features))
+            if used_sess == 0:
+                lambdamart_data = sess_data
+                used_sess += 1
             else:
-                bad_sess += 1
-                continue
-            if hred_use == True:
-                if used_sess == len(hred.features):
-                    break
+                lambdamart_data = np.hstack((lambdamart_data, sess_data))
+                used_sess += 1
             if used_sess % 1000 == 0:
-                lambda_dataframe = pd.DataFrame(data=np.transpose(lambdamart_data), columns=headers)
                 print("[Visited %s anchor queries. %d sessions were skipped.]" % (used_sess, bad_sess))
-                lambda_dataframe.to_csv('../data/lamdamart_data_' + experiment_string + '.csv')
+        lambda_dataframe = pd.DataFrame(data=np.transpose(lambdamart_data), columns=headers)
+        lambda_dataframe.to_csv('../data/lamdamart_data_' + experiment_string + '.csv')
         lambdamart_data = np.transpose(lambdamart_data)
     pd.read_csv('../data/lamdamart_data_long_tail.csv')
     print("---" * 30)
@@ -353,30 +330,31 @@ def noisy_query_prediction(sessions, background_set):
 # 1 Next-QueryPrediction (when anchor query exists in background data)
 # for each session:
 
-experiment_string = "next_query"
-print("Performing experiment: " + experiment_string)
-corresponding_queries = next_query_prediction(sessions, experiment_string)
-print("---" * 30)
-
-# 2 RobustPrediction (when the context is perturbed with overly common queries)
-# label 100 most frequent queries in the background set as noisy
-
-for i, session in enumerate(sessions):
-    if i == 0:
-        background_set = session
-    background_set += session
-
-experiment_string = "noisy"
-print("Performing experiment: " + experiment_string)
-noisy_query_sessions = noisy_query_prediction(sessions, background_set)
-corresponding_queries_noisy = next_query_prediction(noisy_query_sessions, experiment_string)
-print("---" * 30)
-
-# 3 Long-TailPrediction (when the anchor is not present in the background data)
-# train, val and test set retain sessions for which the anchor query has not been
-# seen in the background set (long-tail query)
-
-experiment_string = "long_tail"
-print("Performing experiment: " + experiment_string)
-corresponding_queries_lt = make_long_tail_set(sessions, experiment_string)
-print("---" * 30)
+#experiment_string = "next_query"
+#print("Performing experiment: " + experiment_string)
+#corresponding_queries = next_query_prediction(sessions, experiment_string)
+#print("---" * 30)
+#
+## 2 RobustPrediction (when the context is perturbed with overly common queries)
+## label 100 most frequent queries in the background set as noisy
+#
+#for i, session in enumerate(sessions):
+#    if i == 0:
+#        background_set = session
+#    else:
+#        background_set += session
+#
+#experiment_string = "noisy"
+#print("Performing experiment: " + experiment_string)
+#noisy_query_sessions = noisy_query_prediction(sessions, background_set)
+#corresponding_queries_noisy = next_query_prediction(noisy_query_sessions, experiment_string)
+#print("---" * 30)
+#
+## 3 Long-TailPrediction (when the anchor is not present in the background data)
+## train, val and test set retain sessions for which the anchor query has not been
+## seen in the background set (long-tail query)
+#
+#experiment_string = "long_tail"
+#print("Performing experiment: " + experiment_string)
+#corresponding_queries_lt = make_long_tail_set(sessions, experiment_string)
+#print("---" * 30)
