@@ -5,9 +5,6 @@ import cPickle as pkl
 from datetime import datetime
 import numpy as np
 
-suitable_sessions_fname = "../data/lm_tr_sessions.pkl"
-
-
 class ADJ(Ranker):
     suitable_sessions = []
     bg_info = defaultdict(Counter)
@@ -65,10 +62,10 @@ class ADJ(Ranker):
 
     @staticmethod
     def find_suitable_sessions():
-
+        suitable_sessions_fname = "../data/lm_test_sessions.pkl"
         if os.path.isfile(suitable_sessions_fname):
             time = datetime.now().strftime('%d-%m %H:%M:%S')
-            print("[%s: Loading %d...]" % (time, suitable_sessions_fname))
+            print("[%s: Loading lm_val_sessions.pkl...]" % time)
             with open(suitable_sessions_fname, 'rb') as pkl_file:
                 ADJ.suitable_sessions = pkl.load(pkl_file)
             time = datetime.now().strftime('%d-%m %H:%M:%S')
@@ -76,9 +73,9 @@ class ADJ(Ranker):
             return ADJ.suitable_sessions
 
         time = datetime.now().strftime('%d-%m %H:%M:%S')
-        print("[%s: Creating suitable sessions...]" % time)
         ADJ.suitable_sessions = []
         l = float(len(ADJ.sessions))
+        print("[%s: Searching for sessions in %d sessions...]" % (time, l))
         for i, session in enumerate(ADJ.sessions):
             anchor_query = session[-2]
             target_query = session[-1]
@@ -89,7 +86,8 @@ class ADJ(Ranker):
 
             if i % 120 == 0:
                 print 'checked session {}, at {}%'.format(i, np.round(i / l * 100))
-
+        time = datetime.now().strftime('%d-%m %H:%M:%S')
+        print("[%s: Saving file lm_test_sessions.pkl...]" % time)
         pkl_file = open(suitable_sessions_fname, 'wb')
         pkl.dump(ADJ.suitable_sessions, pkl_file)
         pkl_file.close()
