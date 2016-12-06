@@ -295,7 +295,8 @@ def make_long_tail_set(sessions, experiment_string):
 
 
 def count_query_frequency():
-    counts = Counter(adj.bg_sessions)
+    background = [query for session in adj.bg_sessions for query in session]
+    counts = Counter(background)
     highest_100 = counts.most_common(100)
     noise_freq = {q:f for q, f in highest_100}
     return noise_freq
@@ -323,10 +324,10 @@ def noisy_query_prediction():
 # 1 Next-QueryPrediction (when anchor query exists in background data)
 # for each session:
 
-#experiment_string = "next_query"
-#print("Performing experiment: " + experiment_string)
-#corresponding_queries = next_query_prediction(sessions, experiment_string)
-#print("---" * 30)
+experiment_string = "next_query"
+print("Performing experiment: " + experiment_string)
+corresponding_queries = next_query_prediction(sessions, experiment_string)
+print("---" * 30)
 #
 ## 2 RobustPrediction (when the context is perturbed with overly common queries)
 ## label 100 most frequent queries in the background set as noisy
