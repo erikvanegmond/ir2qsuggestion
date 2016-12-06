@@ -11,7 +11,7 @@ import pandas as pd
 from rankpy.models import LambdaMART
 from rankpy.queries import Queries
 
-hred_use = True
+hred_use = False
 
 import features.adj as ad
 import features.cossimilar as cs
@@ -98,7 +98,7 @@ def lambdaMart(data, experiment_string):
 
     logging.info('================================================================================')
 
-    model = LambdaMART(metric='nDCG@20', n_estimators=500, subsample=0.5)
+    model = LambdaMART(metric='nDCG@20', n_estimators=30, subsample=0.5)
     logging.info("[Created model, starting training...]")
     model.fit(training_queries)#, validation_queries=validation_queries)
 
@@ -195,7 +195,6 @@ def create_dataframe_headers():
 
 
 def next_query_prediction(sessions, experiment_string):
-    used_sess = 0
     corresponding_queries = []
     if os.path.isfile('../data/lamdamart_data_' + experiment_string + '.csv'):
         print "read csv!"
@@ -206,6 +205,7 @@ def next_query_prediction(sessions, experiment_string):
         # lambdaMart(lambdamart_data, experiment_string)
     else:
         print('Could not find ../data/lamdamart_data_' + experiment_string + '.csv')
+#        used_sess = 0
 #        headers = create_dataframe_headers()
 #        for i, session in enumerate(sessions):
 #            anchor_query = session[-2]
