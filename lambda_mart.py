@@ -324,10 +324,10 @@ def noisy_query_prediction():
 # 1 Next-QueryPrediction (when anchor query exists in background data)
 # for each session:
 
-#experiment_string = "next_query"
-#print("Performing experiment: " + experiment_string)
-#corresponding_queries = next_query_prediction(sessions, experiment_string)
-#print("---" * 30)
+experiment_string = "next_query"
+print("Performing experiment: " + experiment_string)
+corresponding_queries = next_query_prediction(sessions, experiment_string)
+print("---" * 30)
 #
 ## 2 RobustPrediction (when the context is perturbed with overly common queries)
 ## label 100 most frequent queries in the background set as noisy
