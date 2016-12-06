@@ -22,8 +22,8 @@ if hred_use == True:
     import features.HRED as hredf
 import features.bg_count as bgcount
 
-#adj = ad.ADJ()
-#sessions = adj.find_suitable_sessions()
+adj = ad.ADJ()
+sessions = adj.find_suitable_sessions()
 lev = levs.Levenshtein()
 lendif = ld.LengthDiff()
 leng = lg.Length()
@@ -294,34 +294,27 @@ def make_long_tail_set(sessions, experiment_string):
     return corresponding_queries
 
 
-def count_query_frequency(query_list):
-    noise_freq = []
-    counts = Counter(np.array(query_list))
+def count_query_frequency():
+    counts = Counter(adj.bg_sessions)
     highest_100 = counts.most_common(100)
-    for i in range(100):
-        noise_freq.append(highest_100[i][1])
-    return highest_100, noise_freq
+    noise_freq = {q:f for q, f in highest_100}
+    return noise_freq
 
 
-def get_random_noise(highest_100, noise_prob):
-    total = sum(w for w in noise_prob)
-    r = random.uniform(0, total)
-    upto = 0
-    for index, w in enumerate(noise_prob):
-        if upto + w >= r:
-            return highest_100[index][0]
-        upto += w
-    assert False, "Shouldn't get here"
+def get_random_noise(noise_prob):
+    norm = sum(noise_prob.values())
+    probs = np.array(noise_prob.values(), np.float32) / norm
+    # probability of sampling a noisy query is proportional to frequency of query in background set
+    return np.random.choice(noise_prob.keys(), p=probs)
 
-
-def noisy_query_prediction(sessions, background_set):
-    highest_100, noise_freq = count_query_frequency(background_set)
+def noisy_query_prediction():
+    print('[Creating noisy queries.]')
+    noise_freq = count_query_frequency()
     for session in sessions:
         # for each entry in the training, val and test set insert noisy query at random position
-        random_place = np.random.randint(0, len(session))
-        noise = get_random_noise(highest_100, noise_freq)
-        # probability of sampling a noisy query is proportional to frequency of query in background set
-        session[random_place] = noise
+        random_place = np.random.randint(0, len(session)-1)
+        noise = get_random_noise(noise_freq)
+        session.insert(random_place, noise)
     noisy_sessions = sessions
     return noisy_sessions
 
