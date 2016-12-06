@@ -295,7 +295,8 @@ def make_long_tail_set(sessions, experiment_string):
 
 
 def count_query_frequency():
-    counts = Counter(adj.bg_sessions)
+    background = [query for session in adj.bg_sessions for query in session]
+    counts = Counter(background)
     highest_100 = counts.most_common(100)
     noise_freq = {q:f for q, f in highest_100}
     return noise_freq
