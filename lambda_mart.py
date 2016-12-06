@@ -23,7 +23,6 @@ if hred_use == True:
 import features.bg_count as bgcount
 
 adj = ad.ADJ()
-sessions = adj.find_suitable_sessions()
 lev = levs.Levenshtein()
 lendif = ld.LengthDiff()
 leng = lg.Length()
@@ -126,7 +125,7 @@ def lambdaMart(data, experiment_string):
 #    mean_rank = np.mean([1 / (r[i] + 1) for i, r in izip(indexes_ones, rankings)])
 #    logging.info('MRR: %s' % mean_rank)
     print('[Done training, saving model...]')
-    model.save('LambdaMART_L7_S0.1_E50_' + experiment_string + model.metric)
+    model.save('../models/LambdaMART_' + experiment_string + model.metric)
     print("Done with experiment" + experiment_string)
 
 
@@ -195,104 +194,75 @@ def create_dataframe_headers():
 
 
 def next_query_prediction(sessions, experiment_string):
-    corresponding_queries = []
-    if os.path.isfile('../lamdamart_data_' + experiment_string + '.csv'):
-        print "read csv!"
-        df = pd.read_csv('../data/lamdamart_data_' + experiment_string + '.csv')
-        df.drop('Unnamed: 0', 1)
-        lambdamart_data = df.get_values()[:, 1:]
-        print "loaded!!!!"
-        # lambdaMart(lambdamart_data, experiment_string)
-    else:
-        #print('Could not find ../data/lamdamart_data_' + experiment_string + '.csv')
-        used_sess = 0
-        headers = create_dataframe_headers()
-        for i, session in enumerate(sessions):
-            anchor_query = session[-2]
-            target_query = session[-1]
-            # extract 20 queries with the highest ADJ score (most likely to follow the anchor query in the data)
-            adj_dict = adj.adj_function(anchor_query)
-            highest_adj_queries = adj_dict['adj_queries']
-            features, highest_adj_queries = create_features(anchor_query, session)
-            target_vector = -1 * np.ones(len(highest_adj_queries))
-            [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
-            target_vector[target_query_index] = 1
-            # then add the session to the train, val, test data
-            sess_data = np.vstack((np.transpose(target_vector), features))
-            if used_sess == 0:
-           	    lambdamart_data = sess_data
-		    used_sess += 1
-            else:
-                lambdamart_data = np.hstack((lambdamart_data, sess_data))
-                used_sess += 1
-            if used_sess % 1000 == 0:
-                print("[Visited %s anchor queries.]" % used_sess)
-        lambda_dataframe = pd.DataFrame(data=np.transpose(lambdamart_data), columns=headers)
-        lambda_dataframe.to_csv('../data/lamdamart_data_' + experiment_string + '.csv')
-        lambdamart_data = np.transpose(lambdamart_data)
-        print("---" * 30)
-        print("used sessions:" + str(used_sess))
-
-    lambdaMart(np.transpose(lambdamart_data), experiment_string)
-    return corresponding_queries
-
+    used_sess = 0
+    headers = create_dataframe_headers()
+    for i, session in enumerate(sessions):
+        anchor_query = session[-2]
+        target_query = session[-1]
+        # extract 20 queries with the highest ADJ score (most likely to follow the anchor query in the data)
+        adj_dict = adj.adj_function(anchor_query)
+        highest_adj_queries = adj_dict['adj_queries']
+        features, highest_adj_queries = create_features(anchor_query, session)
+        target_vector = -1 * np.ones(len(highest_adj_queries))
+        [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
+        target_vector[target_query_index] = 1
+        # then add the session to the train, val, test data
+        sess_data = np.vstack((np.transpose(target_vector), features))
+        if used_sess == 0:
+            lambdamart_data = sess_data
+            used_sess += 1
+        else:
+            lambdamart_data = np.hstack((lambdamart_data, sess_data))
+            used_sess += 1
+        if used_sess % 1000 == 0:
+            print("[Visited %s anchor queries.]" % used_sess)
+    lambda_dataframe = pd.DataFrame(data=np.transpose(lambdamart_data), columns=headers)
+    lambda_dataframe.to_csv('../data/lamdamart_data_' + experiment_string + '.csv')
+    print("---" * 30)
+    print("used sessions:" + str(used_sess))
 
 def shorten_query(query):
     query = query.rsplit(' ', 1)[0]
     return query
 
 
-def make_long_tail_set(experiment_string):
+def make_long_tail_set(sessions, experiment_string):
     used_sess = 0
-    bad_sess = 0
-    corresponding_queries = []
-    if os.path.isfile('../data/lamdamart_data_long_tail.csv'):
-        print "read csv!"
-        df = pd.read_csv('../data/lamdamart_data_long_tail.csv')
-        df.drop('Unnamed: 0', 1)
-        lambdamart_data = df.get_values()[:, 1:]
-        print "loaded!!!!"
-    else:
-        headers = create_dataframe_headers()
-        for session in sessions:
-            # get anchor query and target query from session
-            anchor_query = session[-2]
-            target_query = session[-1]
-            # Cannot use ADJ
-            # Therefore iteratively shorten anchor query by dropping terms
-            # until we have a query that appears in the Background data
-            for j in range(len(anchor_query.split())):
-                [background_count] = bgc.calculate_feature(None, [anchor_query])
-                
-                if background_count == 0 and len(anchor_query.split()) > 1:
-                    print("shortened")
-                    anchor_query = shorten_query(anchor_query)
-                else:
-                    break
-            features, highest_adj_queries = create_features(anchor_query, session)
-            # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
-            target_vector = -1 * np.ones(len(highest_adj_queries))
-            [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
-            target_vector[target_query_index] = 1
-            # then add the session to the train, val, test data
-            sess_data = np.vstack((np.transpose(target_vector), features))
-            if used_sess == 0:
-                lambdamart_data = sess_data
-                used_sess += 1
+    headers = create_dataframe_headers()
+    for session in sessions:
+        # get anchor query and target query from session
+        anchor_query = session[-2]
+        target_query = session[-1]
+        # Cannot use ADJ
+        # Therefore iteratively shorten anchor query by dropping terms
+        # until we have a query that appears in the Background data
+        for j in range(len(anchor_query.split())):
+            [background_count] = bgc.calculate_feature(None, [anchor_query])
+            
+            if background_count == 0 and len(anchor_query.split()) > 1:
+                print("shortened")
+                anchor_query = shorten_query(anchor_query)
             else:
-                lambdamart_data = np.hstack((lambdamart_data, sess_data))
-                used_sess += 1
-            if used_sess % 1000 == 0:
-                print("[Visited %s anchor queries. %d sessions were skipped.]" % (used_sess, bad_sess))
-        lambda_dataframe = pd.DataFrame(data=np.transpose(lambdamart_data), columns=headers)
-        lambda_dataframe.to_csv('../data/lamdamart_data_' + experiment_string + '.csv')
-        lambdamart_data = np.transpose(lambdamart_data)
-    pd.read_csv('../data/lamdamart_data_long_tail.csv')
+                break
+        features, highest_adj_queries = create_features(anchor_query, session)
+        # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
+        target_vector = -1 * np.ones(len(highest_adj_queries))
+        [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
+        target_vector[target_query_index] = 1
+        # then add the session to the train, val, test data
+        sess_data = np.vstack((np.transpose(target_vector), features))
+        if used_sess == 0:
+            lambdamart_data = sess_data
+            used_sess += 1
+        else:
+            lambdamart_data = np.hstack((lambdamart_data, sess_data))
+            used_sess += 1
+        if used_sess % 1000 == 0:
+            print("[Visited %s anchor queries.]" % used_sess)
+    lambda_dataframe = pd.DataFrame(data=np.transpose(lambdamart_data), columns=headers)
+    lambda_dataframe.to_csv('../data/lamdamart_data_' + experiment_string + '.csv')
     print("---" * 30)
     print("used sessions:" + str(used_sess))
-    # lambdaMart(np.transpose(lambdamart_data), experiment_string)
-    return corresponding_queries
-
 
 def count_query_frequency():
     background = [query for session in adj.bg_sessions for query in session]
@@ -308,7 +278,7 @@ def get_random_noise(noise_prob):
     # probability of sampling a noisy query is proportional to frequency of query in background set
     return np.random.choice(noise_prob.keys(), p=probs)
 
-def noisy_query_prediction():
+def noisy_query_prediction(sessions):
     print('[Creating noisy queries.]')
     noise_freq = count_query_frequency()
     for session in sessions:
@@ -326,7 +296,7 @@ def noisy_query_prediction():
 
 #experiment_string = "next_query"
 #print("Performing experiment: " + experiment_string)
-#corresponding_queries = next_query_prediction(experiment_string)
+#corresponding_queries = next_query_prediction(sessions, experiment_string)
 #print("---" * 30)
 #
 ## 2 RobustPrediction (when the context is perturbed with overly common queries)

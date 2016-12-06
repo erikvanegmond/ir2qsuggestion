@@ -25,6 +25,7 @@ def aug_data(data):
         auged_data.append(tmp.astype(np.int32))
     return auged_data
 
+sessions = lm.adj.find_suitable_sessions("../data/lm_train_sessions.pkl")
 # Do LambdaMart for 3 different scenario's
 # 1 Next-QueryPrediction (when anchor query exists in background data)
 # for each session:
@@ -32,7 +33,7 @@ def create_next_query_csv():
     print('[Creating dataset for next_query predictions.]')
     experiment_string = "next_query"
     print("Performing experiment: " + experiment_string)
-    corresponding_queries = lm.next_query_prediction(lm.sessions, experiment_string)
+    lm.next_query_prediction(sessions, experiment_string)
     print("---" * 30)
 
 ## 2 RobustPrediction (when the context is perturbed with overly common queries)
@@ -40,8 +41,8 @@ def create_next_query_csv():
 def create_noisy_query_csv():
     experiment_string = "noisy"
     print("Performing experiment: " + experiment_string)
-    noisy_query_sessions = lm.noisy_query_prediction()
-    corresponding_queries_noisy = lm.next_query_prediction(noisy_query_sessions, experiment_string)
+    noisy_query_sessions = lm.noisy_query_prediction(sessions)
+    lm.next_query_prediction(noisy_query_sessions, experiment_string)
     print("---" * 30)
 
 # 3 Long-TailPrediction (when the anchor is not present in the background data)
@@ -50,7 +51,7 @@ def create_noisy_query_csv():
 def create_longtail_query_csv():
     experiment_string = "long_tail"
     print("Performing experiment: " + experiment_string)
-    corresponding_queries_lt = lm.make_long_tail_set(lm.sessions, experiment_string)
+    lm.make_long_tail_set(sessions, experiment_string)
     print("---" * 30)
 
 #def next_query_HRED_features():
