@@ -35,6 +35,7 @@ def create_next_query_csv():
     print("Performing experiment: " + experiment_string)
     lm.next_query_prediction(sessions, experiment_string)
     print("---" * 30)
+    lm.hred.save()
 
 ## 2 RobustPrediction (when the context is perturbed with overly common queries)
 ## label 100 most frequent queries in the background set as noisy
@@ -44,6 +45,7 @@ def create_noisy_query_csv():
     noisy_query_sessions = lm.noisy_query_prediction(sessions)
     lm.next_query_prediction(noisy_query_sessions, experiment_string)
     print("---" * 30)
+    lm.hred.save()
 
 # 3 Long-TailPrediction (when the anchor is not present in the background data)
 # train, val and test set retain sessions for which the anchor query has not been
@@ -53,6 +55,7 @@ def create_longtail_query_csv():
     print("Performing experiment: " + experiment_string)
     lm.make_long_tail_set(sessions, experiment_string)
     print("---" * 30)
+    lm.hred.save()
 
 #def next_query_HRED_features():
 #    hred = hredf.HRED()
