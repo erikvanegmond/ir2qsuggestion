@@ -29,16 +29,28 @@ class HRED(DatasetFeature):
     def calculate_feature(compared_query, queries):
         fts = []
         for q in queries:
-            try:
-                fts.append(DatasetFeature.features[compared_query][q])
-            except KeyError:
-                print('KeyError: ' + compared_query)
-                num_anchor_query = utils.vectorify(compared_query)
-                num_sug_query = utils.vectorify(q)                    
-                likelihood = DatasetFeature.model.likelihood(num_anchor_query, num_sug_query)
+            if compared_query in DatasetFeature.features.keys():
+                if q in DatasetFeature.features[compared_query].keys():
+                    fts.append(DatasetFeature.features[compared_query][q])
+                else:
+                    print('Unknown suggestion: ' + q)
+                    likelihood = HRED.add_likelihood(compared_query, q)
+                    DatasetFeature.features[compared_query][q] = likelihood
+                    fts.append(DatasetFeature.features[compared_query][q])
+            else:
+                print('Unknown anchor query: ' + compared_query)
+                DatasetFeature.features[compared_query] = {}
+                likelihood = HRED.add_likelihood(compared_query, q)
                 DatasetFeature.features[compared_query][q] = likelihood
                 fts.append(DatasetFeature.features[compared_query][q])
-                HRED.unsaved_changes = True
                 
         HRED.cooccurrences[compared_query]['HRED'] = fts
         return fts
+    @staticmethod
+    def add_likelihood(compared_query, q):
+        num_anchor_query = utils.vectorify(compared_query)
+        num_sug_query = utils.vectorify(q)                    
+        likelihood = DatasetFeature.model.likelihood(num_anchor_query, num_sug_query)
+        DatasetFeature.unsaved_changes = True
+
+        return likelihood

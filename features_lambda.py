@@ -1,7 +1,6 @@
 import cPickle
 import numpy as np
 import lambda_mart as lm
-import features.adj as ad
 
 def getFeatures(m, anchor, suggestions):
     initial = m.init_rep
@@ -31,31 +30,32 @@ sessions = lm.adj.find_suitable_sessions("../data/lm_train_sessions.pkl")
 # for each session:
 def create_next_query_csv():
     print('[Creating dataset for next_query predictions.]')
-    experiment_string = "next_query"
+    experiment_string = "next_query_test"
     print("Performing experiment: " + experiment_string)
     lm.next_query_prediction(sessions, experiment_string)
     print("---" * 30)
-    lm.hred.save()
+    lm.hred.save(data_file="../data/HRED_features_test_next_query.pkl")
 
 ## 2 RobustPrediction (when the context is perturbed with overly common queries)
 ## label 100 most frequent queries in the background set as noisy
 def create_noisy_query_csv():
-    experiment_string = "noisy"
+    experiment_string = "noisy_test"
     print("Performing experiment: " + experiment_string)
     noisy_query_sessions = lm.noisy_query_prediction(sessions)
     lm.next_query_prediction(noisy_query_sessions, experiment_string)
     print("---" * 30)
-    lm.hred.save()
+    lm.hred.save(data_file="../data/HRED_features_test_noisy.pkl")
 
 # 3 Long-TailPrediction (when the anchor is not present in the background data)
 # train, val and test set retain sessions for which the anchor query has not been
 # seen in the background set (long-tail query)
 def create_longtail_query_csv():
-    experiment_string = "long_tail"
+    experiment_string = "long_tail_test"
     print("Performing experiment: " + experiment_string)
     lm.make_long_tail_set(sessions, experiment_string)
     print("---" * 30)
-    lm.hred.save()
+    lm.hred.save(data_file="../data/HRED_features_test_longtail.pkl")
 
 print('[Creating test features.]')
+
 create_longtail_query_csv()
