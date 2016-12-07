@@ -33,11 +33,13 @@ class HRED(DatasetFeature):
                 fts.append(DatasetFeature.features[compared_query][q])
             except KeyError:
                 print('KeyError: ' + compared_query)
+                DatasetFeature.features[compared_query] = {}
                 num_anchor_query = utils.vectorify(compared_query)
                 num_sug_query = utils.vectorify(q)                    
                 likelihood = DatasetFeature.model.likelihood(num_anchor_query, num_sug_query)
                 DatasetFeature.features[compared_query][q] = likelihood
                 fts.append(DatasetFeature.features[compared_query][q])
+                HRED.unsaved_changes = True
                 
         HRED.cooccurrences[compared_query]['HRED'] = fts
         return fts
