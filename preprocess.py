@@ -1,16 +1,23 @@
+import csv
+from _license import defaultdict
 from collections import Counter
-
+from datetime import *
 import pandas as pd
 import os
 import argparse
 import re
-from utils import save_df
 import pickle as pkl
 
 '''
-How to use this script:
-1. Set the data path and the output datapath for your system. The output directory does not have to exist yet.
-2. Run the script from the command line: python preprocess.py -n 10  if you want to preprocess all files.
+This script will generate 12 files. a .out .ctx and a .new file for each dataset {bg, train, test, validation}
+.ctx and .out should be as you all know. .new are the potential new features.
+Each line is session, queries seperated by tabs (\t), each query has multiple features separated by commas (,):
+click_bool, click_rank, domain, time_since_last_query,time_since_last_click
+Click rank is 0 if there is no click. domain, time_since_last_query,time_since_last_click are empty if not available.
+'''
+'''
+TODO
+* collect new features per session (average time between queries, number of queries, session lenght)
 '''
 
 
@@ -19,24 +26,127 @@ class Preprocessor:
     output_data_path = "../preprocessed-data/"
 
     word_counter = Counter()
-    count_words = True
     most_common_words = dict()
+    datetime_mask = '%Y-%m-%d %H:%M:%S'
 
-    def __init__(self):
-        pass
+    def __init__(self, vocab_file_path="../data/aol_vocab.dict.pkl"):
+        print "init"
+        pkl_file = open(vocab_file_path, 'rb')
+        vocab = pkl.load(pkl_file)
+        self.w2n = defaultdict(int, {w: n1 for w, n1, n2 in vocab})
+        self.n2w = {n1: w for w, n1, n2 in vocab}
+        self.thirty_minutes = timedelta(minutes=30)
+        self.time_zero = timedelta(minutes=0)
+        print "loaded"
 
     def preprocess_files_first_pass(self, max_files=10):
-        print "reading {} files".format(max_files)
+        files = {'bg': {'ctx': open('{}bg_session.ctx'.format(self.output_data_path), 'w'),
+                        'out': open('{}bg_session.out'.format(self.output_data_path), 'w'),
+                        'new': open('{}bg_session.new'.format(self.output_data_path), 'w')},
+                 'test': {'ctx': open('{}test_session.ctx'.format(self.output_data_path), 'w'),
+                          'out': open('{}test_session.out'.format(self.output_data_path), 'w'),
+                          'new': open('{}test_session.new'.format(self.output_data_path), 'w')},
+                 'validation': {'ctx': open('{}val_session.ctx'.format(self.output_data_path), 'w'),
+                                'out': open('{}val_session.out'.format(self.output_data_path), 'w'),
+                                'new': open('{}val_session.new'.format(self.output_data_path), 'w')},
+                 'train': {'ctx': open('{}tr_session.ctx'.format(self.output_data_path), 'w'),
+                           'out': open('{}tr_session.out'.format(self.output_data_path), 'w'),
+                           'new': open('{}tr_session.new'.format(self.output_data_path), 'w')}}
+
+        print "reading {} files at {}".format(max_files, self.data_path)
         file_counter = 0
         for fn in os.listdir(self.data_path):
             file_path = self.data_path + fn
             if os.path.isfile(file_path) and fn.startswith('user-ct-test-collection') and file_counter < max_files:
-                print("loading {}...".format(file_path))
-                data = pd.read_csv(file_path, sep="\t", usecols=[0, 1, 2])
-                print("preprocessing {}...".format(file_path))
-                data = self.preprocess_data_first(data)
-                save_df(self.output_data_path, data, fn)
-                file_counter += 1
+                with open(file_path, 'rb') as csv_file:
+                    print "processing {}".format(file_path)
+                    reader = csv.DictReader(csv_file, delimiter='\t')
+                    last_time = 0
+                    last_query_time = 0
+                    delta_time = self.time_zero
+                    queries = []
+                    session_list_ctx = []
+                    session_list_out = []
+                    session_list_new = []
+                    anonID = '0'
+                    for i, row in enumerate(reader):
+                        if i%10000 is 0:
+                            print "{} lines processed".format(i)
+
+                        cur_time = datetime.strptime(row['QueryTime'], self.datetime_mask)
+                        if last_time:
+                            delta_time = cur_time - last_time
+                        else:
+                            delta_time = self.time_zero
+
+                        if delta_time > self.thirty_minutes or (anonID != row['AnonID'] and anonID != '0'):
+                            self.write_data(files, session_list_out, session_list_ctx, session_list_new, queries)
+                            last_time = 0
+                            last_query_time = 0
+                            delta_time = self.time_zero
+                            session_list_ctx = []
+                            session_list_out = []
+                            session_list_new = []
+                            queries = []
+
+                        anonID = row['AnonID']
+                        query = self.alphanumeric_preprocessor(row['Query'])
+                        session_list_ctx.append(query)
+                        session_list_out.append(self.text2out(query))
+                        new_feature, last_query_time = self.new_features(row, cur_time, delta_time, last_query_time)
+                        session_list_new.append(new_feature)
+                        queries.append(row)
+                        last_time = datetime.strptime(row['QueryTime'], self.datetime_mask)
+                self.write_data(files, session_list_out, session_list_ctx, session_list_new, queries)
+
+        self.close_files(files)
+
+    @staticmethod
+    def new_features(log_line, cur_time, delta_time, last_click_time):
+        '''(click bool, click rank, click domain, time since last query, time since last click)'''
+        click_bool = 0
+        click_rank = 0
+        time_since_last_click = ""
+        time_since_last_query = ""
+        if len(log_line['ItemRank']):
+            click_bool = 1
+            click_rank = log_line['ItemRank']
+            last_click_time = cur_time
+        domain = log_line['ClickURL']
+        if last_click_time:
+            time_since_last_click = (cur_time - last_click_time).total_seconds()
+
+        time_since_last_query = delta_time.total_seconds()
+
+        return "{}, {}, {}, {}, {}".format(click_bool, click_rank, domain, time_since_last_query,
+                                           time_since_last_click), last_click_time
+
+    def text2out(self, text):
+        out = []
+        for word in text.split():
+            out.append(self.w2n[word])
+        return " ".join(map(str, out))
+
+    def write_data(self, files, session_list_out, session_list_ctx, session_list_new, queries):
+        t = datetime.strptime(queries[0]['QueryTime'], self.datetime_mask)
+        if t < datetime(year=2006, month=05, day=01):
+            data_set = files['bg']
+        elif t < datetime(year=2006, month=05, day=14):
+            data_set = files['train']
+        elif t < datetime(year=2006, month=05, day=21):
+            data_set = files['test']
+        else:
+            data_set = files['validation']
+
+        data_set['ctx'].write("\t".join(session_list_ctx) + "\n")
+        data_set['out'].write("\t".join(session_list_out) + "\n")
+        data_set['new'].write("\t".join(session_list_new) + "\n")
+
+    @staticmethod
+    def close_files(files):
+        for s in files:
+            for f in files[s]:
+                files[s][f].close()
 
     def preprocess_files_second_pass(self, max_files=10):
         """
@@ -49,12 +159,13 @@ class Preprocessor:
         for fn in os.listdir(self.output_data_path):
             file_path = self.output_data_path + fn
             if os.path.isfile(file_path) and fn.startswith('user-ct-test-collection') and file_counter < max_files:
-                print("loading {}...".format(file_path))
-                data = pd.read_csv(file_path, sep=",")
-                print("preprocessing {}...".format(file_path))
-                data = self.preprocess_data_second(data)
-                save_df(self.output_data_path, data, fn)
-                file_counter += 1
+                # print("loading {}...".format(file_path))
+                # data = pd.read_csv(file_path, sep=",")
+                # print("preprocessing {}...".format(file_path))
+                # data = self.preprocess_data_second(data)
+                # save_df(self.output_data_path, data, fn)
+                # file_counter += 1
+                return
 
     def alphanumeric_preprocessor(self, text):
         """
@@ -64,8 +175,6 @@ class Preprocessor:
         """
         try:
             s = re.sub("\s\s+", " ", re.sub("[^a-z1-9]", " ", text.lower()))
-            if self.count_words:
-                self.word_counter.update(s.split())
             return s
         except:
             # most likely nan, but if it fails just assume empty.
@@ -110,23 +219,19 @@ def __main__():
     parser.add_argument('--redo-wordcount', dest='redo_wordcount', action='store_true')
 
     args = parser.parse_args()
-    if os.path.isfile('wordcounts.pkl') and not args.redo_wordcount:
-        pp.count_words = False
-        pkl_file = open('wordcounts.pkl', 'rb')
-        pp.word_counter = pkl.load(pkl_file)
-    print "Counting words: {}".format(pp.count_words)
 
+    print "go"
     pp.preprocess_files_first_pass(args.nfiles)
 
-    if pp.count_words:
-        output = open('wordcounts.pkl', 'wb')
-        print "keeping 90000 words from {}".format(len(pp.word_counter))
-        pkl.dump(pp.word_counter.most_common(90000), output)
-        output.close()
-
-    pp.most_common_words = dict(pp.word_counter)
-
-    pp.preprocess_files_second_pass(args.nfiles)
+    # if pp.count_words:
+    #     output = open('wordcounts.pkl', 'wb')
+    #     print "keeping 90000 words from {}".format(len(pp.word_counter))
+    #     pkl.dump(pp.word_counter.most_common(90000), output)
+    #     output.close()
+    #
+    # pp.most_common_words = dict(pp.word_counter)
+    #
+    # pp.preprocess_files_second_pass(args.nfiles)
 
 
 __main__()
