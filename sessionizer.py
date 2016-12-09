@@ -1,4 +1,4 @@
-from itertools import izip
+#from itertools import izip
 
 
 class Sessionizer(object):
@@ -12,11 +12,11 @@ class Sessionizer(object):
         self.number_sessions = []
 
     def find_all_sessions(self):
-        print "locating all sessions"
+        print("locating sessions " + self.data_path)
         self.sessions = []
         self.number_sessions = []
         with open(self.data_path + ".ctx") as ctx, open(self.data_path + ".out") as out:
-            for ctx_line, out_line in izip(ctx, out):
+            for ctx_line, out_line in zip(ctx, out):
                 queries = ctx_line.rstrip('\n').split('\t')
                 if len(set(queries)) > 1:
                     self.sessions.append(queries)

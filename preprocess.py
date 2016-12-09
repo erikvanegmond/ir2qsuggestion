@@ -23,7 +23,7 @@ TODO
 
 class Preprocessor:
     data_path = "../AOL-user-ct-collection/"
-    output_data_path = "../preprocessed-data/"
+    output_data_path = "../data/"
 
     word_counter = Counter()
     most_common_words = dict()
