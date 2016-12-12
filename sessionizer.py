@@ -20,7 +20,7 @@ class Sessionizer(object):
                 queries = ctx_line.rstrip('\n').split('\t')
                 if len(set(queries)) > 1:
                     self.sessions.append(queries)
-                    self.number_sessions.append([map(int, x.split()) for x in out_line.rstrip('\n').split('\t')])
+                    self.number_sessions.append([list(map(int, x.split())) for x in out_line.rstrip('\n').split('\t')])
 
     def get_sessions(self):
         if not len(self.sessions):

@@ -6,6 +6,7 @@ import argparse
 
 import tensorflow as tf
 import numpy as np
+import pickle as pkl
 
 from RNNTensors.jaimy_model import HRED
 from sessionizer import Sessionizer
@@ -25,7 +26,7 @@ CHECKPOINT_DIR_DEFAULT = './checkpoints'
 ### --- END default constants---
 
 # We use a number of buckets and pad to the closest one for efficiency.
-_buckets = [(5, 10), (10, 15), (20, 25), (40, 50)]
+_buckets = [(5, 10), (10, 15), (25, 30), (100, 100)]
             
 def train_step(losses, params, learning_rate, max_gradient_norm, global_step):
     gradient_norms = []
@@ -36,27 +37,43 @@ def train_step(losses, params, learning_rate, max_gradient_norm, global_step):
         clipped_gradients, norm = tf.clip_by_global_norm(gradients, max_gradient_norm)
         gradient_norms.append(norm)
         updates.append(opt.apply_gradients(zip(clipped_gradients, params), global_step=global_step))
+        
+def make_example(sequence, labels):
+    # The object we return
+    ex = tf.train.SequenceExample()
+    # A non-sequential feature of our example
+    sequence_length = len(sequence)
+    ex.context.feature["length"].int64_list.value.append(sequence_length)
+    # Feature lists for the two sequential features of our example
+    fl_tokens = ex.feature_lists.feature_list["tokens"]
+    fl_labels = ex.feature_lists.feature_list["labels"]
+    for token, label in zip(sequence, labels):
+        fl_tokens.feature.add().int64_list.value.append(token)
+        fl_labels.feature.add().int64_list.value.append(label)
+    return ex
 
 def train():
     snizer = Sessionizer()
-    train_sess = snizer.get_num_sessions()
-    snizer = Sessionizer('val_session')
-    val_sess = snizer.get_num_sessions()
+    train_sess = snizer.get_sessions_with_numbers()
+    #snizer = Sessionizer('../data/val_session')
+    #val_sess = snizer.get_sessions_with_numbers()
+    vocab = pkl.load(open('../data/aol_vocab.dict.pkl', 'rb'))
     # Create model
-    model = HRED()
+    model = HRED(len(vocab), 1000, 1500, 1)
+    print('[Model was created.]')
     # Feeds for inputs.
 #    inputs = []
 #    targets = []
-    with tf.varaible_scope('input'):
-        query = tf.placeholder(tf.int32, shape=[None])
-        target = tf.placeholder(tf.int32, shape=[None])
-#        for i in xrange(buckets[-1][0]):  # Last bucket is the biggest one.
-#            targets.append(tf.placeholder(tf.int32, shape=[None], name="target{0}".format(i)))
-#        for i in xrange(buckets[-1][1] + 1):
+    with tf.variable_scope('input'):
+        query = tf.placeholder(tf.int32, shape=[2, 1])
+        target = tf.placeholder(tf.int32, shape=[1, 1])
+#        for i in range(_buckets[-1][0]):  # Last bucket is the biggest one.
 #            inputs.append(tf.placeholder(tf.int32, shape=[None], name="input{0}".format(i)))
+#        for i in range(_buckets[-1][1] + 1):
+#            targets.append(tf.placeholder(tf.int32, shape=[None], name="target{0}".format(i)))
     # Data pipeline
-    logits = model.inference(query, target)
-    loss = model.loss(logits, target)
+    logits = model.inference([query], [target])
+    loss = model.loss(logits, [target])
     # Initialize optimizer
     opt = tf.train.GradientDescentOptimizer(FLAGS.learning_rate)
     opt_operation = opt.minimize(loss)
@@ -67,15 +84,16 @@ def train():
     with tf.Session() as sess:
         # Initialize summary writers
         merged = tf.merge_all_summaries()
-        train_writer = tf.train.SummaryWriter(FLAGS.log_dir + '/train', sess.graph)
-        test_writer = tf.train.SummaryWriter(FLAGS.log_dir + '/test')
+        train_writer = tf.summary.FileWriter(FLAGS.log_dir + '/train', sess.graph)
+        test_writer = tf.summary.FileWriter(FLAGS.log_dir + '/test')
         # Initialize variables
-        sess.run(tf.initialize_all_variables())     
+        sess.run(tf.global_variables_initializer())     
         # Do a loop
-        for iteration in xrange(FLAGS.max_steps):
+        print('[Starting training.]')
+        for iteration in range(FLAGS.max_steps):
         
-            session = np.random.choice(train_sess)
-            x, y = session[-2], session[-1]
+            session = train_sess[0] #np.random.choice(train_sess)
+            x, y = np.array(session[-2]).reshape((2,1)), np.array(session[-1]).reshape((1,1))
 
 #                # Input feed: encoder inputs, decoder inputs, target_weights, as provided.
 #                encoder_size, decoder_size = self.buckets[bucket_id]
@@ -86,12 +104,13 @@ def train():
 #              input_feed[self.decoder_inputs[l].name] = decoder_inputs[l]
 #              input_feed[self.target_weights[l].name] = target_weights[l]
             # sess.run(y, feed_dict={i: d for i, d in zip(inputs, data)})
-            _, summary = sess.run([opt_operation, merged], feed_dict={query: x, target: y})
-            train_writer.add_summary(summary, iteration)
+            _ = sess.run([opt_operation], feed_dict={query: x, target: y})
+            #train_writer.add_summary(summ, iteration)
 #        else:
 #        _ = sess.run([opt_operation], feed_dict={x: x_data, y: y_data})
 #        
-#            if iteration % FLAGS.eval_freq == 0 or iteration == FLAGS.max_steps - 1:
+            if iteration % FLAGS.eval_freq == 0 or iteration == FLAGS.max_steps - 1:
+                print('%s iterations' % iteration)
 #                x_val, y_val = cifar10.test.images, cifar10.test.labels
 #        
 #                summary, accuracy_test = sess.run([merged, acc], feed_dict={x: x_val, y: y_val})
@@ -121,8 +140,6 @@ def main(_):
     # Make directories if they do not exists yet
     if not tf.gfile.Exists(FLAGS.log_dir):
       tf.gfile.MakeDirs(FLAGS.log_dir)
-    if not tf.gfile.Exists(FLAGS.data_dir):
-      tf.gfile.MakeDirs(FLAGS.data_dir)
     
     # Run the training operation
     train()

@@ -24,38 +24,39 @@ def aug_data(data):
         auged_data.append(tmp.astype(np.int32))
     return auged_data
 
-sessions = lm.adj.find_suitable_sessions("../data/lm_train_sessions.pkl")
+sessions = lm.adj.find_suitable_sessions("../data/lm_val_sessions.pkl")
 # Do LambdaMart for 3 different scenario's
 # 1 Next-QueryPrediction (when anchor query exists in background data)
 # for each session:
 def create_next_query_csv():
     print('[Creating dataset for next_query predictions.]')
-    experiment_string = "next_query_test"
+    experiment_string = "next_query_val"
     print("Performing experiment: " + experiment_string)
     lm.next_query_prediction(sessions, experiment_string)
     print("---" * 30)
-    lm.hred.save(data_file="../data/HRED_features_test_next_query.pkl")
+    lm.hred.save()
 
 ## 2 RobustPrediction (when the context is perturbed with overly common queries)
 ## label 100 most frequent queries in the background set as noisy
 def create_noisy_query_csv():
-    experiment_string = "noisy_test"
+    experiment_string = "noisy_val"
     print("Performing experiment: " + experiment_string)
     noisy_query_sessions = lm.noisy_query_prediction(sessions)
     lm.next_query_prediction(noisy_query_sessions, experiment_string)
     print("---" * 30)
-    lm.hred.save(data_file="../data/HRED_features_test_noisy.pkl")
+    lm.hred.save()
 
 # 3 Long-TailPrediction (when the anchor is not present in the background data)
 # train, val and test set retain sessions for which the anchor query has not been
 # seen in the background set (long-tail query)
 def create_longtail_query_csv():
-    experiment_string = "long_tail_test"
+    experiment_string = "long_tail_val"
     print("Performing experiment: " + experiment_string)
     lm.make_long_tail_set(sessions, experiment_string)
     print("---" * 30)
-    lm.hred.save(data_file="../data/HRED_features_test_longtail.pkl")
+    lm.hred.save()
 
-print('[Creating test features.]')
-
+print('[Creating validation features.]')
+create_next_query_csv()
+create_noisy_query_csv()
 create_longtail_query_csv()

@@ -16,7 +16,7 @@ class HRED(object):
   Once initialized an MLP object can perform inference and evaluation.
   """
 
-  def __init__(self, vocab_size, q_dim, s_dim, num_layers, num_samples, is_training=True):
+  def __init__(self, vocab_size, q_dim, s_dim, num_layers, num_samples=512, is_training=True):
     """
     Constructor for an HRED object.
     Args:
@@ -53,22 +53,24 @@ class HRED(object):
         E = tf.get_variable('embedding', (self.vocab_size, self.q_dim), initializer=self.init, regularizer=self.reg)
         with tf.variable_scope('QueryEncoder'):
             # Create the GRU cell(s)
-            single_cell = tf.nn.rnn_cell.GRUCell(self.q_dim, name='single_GRU')
+            single_cell = tf.nn.rnn_cell.GRUCell(self.q_dim)
             if self.num_layers > 1:
-                cell = tf.nn.rnn_cell.MultiRNNCell([single_cell] * self.num_layers, name='mult_GRU')
+                cell = tf.nn.rnn_cell.MultiRNNCell([single_cell] * self.num_layers)
             else:
                 cell = single_cell
             # Loop over all the queries to encode them
             Q = []
+            #state = tf.zeros([cell.state_size])
             for query in session:
                 word_embeddings = tf.nn.embedding_lookup(E, query)
-                _, state = tf.nn.rnn(cell, word_embeddings)
+                word_embeddings = unpack_sequence(word_embeddings)
+                _, state = tf.nn.rnn(cell, word_embeddings, dtype=tf.float32)
                 Q.append(state)
         with tf.variable_scope('SessionEncoder'):
             # Create the GRU cell(s)
-            single_cell = tf.nn.rnn_cell.GRUCell(self.s_dim, name='single_GRU')
+            single_cell = tf.nn.rnn_cell.GRUCell(self.s_dim)
             if self.num_layers > 1:
-                cell = tf.nn.rnn_cell.MultiRNNCell([single_cell] * self.num_layers, name='mult_GRU')
+                cell = tf.nn.rnn_cell.MultiRNNCell([single_cell] * self.num_layers)
             else:
                 cell = single_cell
                 
@@ -77,30 +79,31 @@ class HRED(object):
                 S = []
                 for i in range(len(Q)):
                     queries = Q[:i+1]
-                    outputs, s = tf.nn.rnn(cell, queries)
+                    _, s = tf.nn.rnn(cell, queries, dtype=tf.float32)
                     S.append(s)
             else:
                 # When we're not training we only want to predict the last query
                 _, [S] = tf.nn.rnn(cell, Q)
         with tf.variable_scope('Decoder'):
             # Create the GRU cell(s)
-            single_cell = tf.nn.rnn_cell.GRUCell(self.o_dim, name='single_GRU')
+            single_cell = tf.nn.rnn_cell.GRUCell(self.q_dim)
             if self.num_layers > 1:
-                cell = tf.nn.rnn_cell.MultiRNNCell([single_cell] * self.num_layers, name='mult_GRU')
+                cell = tf.nn.rnn_cell.MultiRNNCell([single_cell] * self.num_layers)
             else:
                 cell = single_cell
-            H0 = tf.get_variable('weights', (self.q_dim, self.s_dim), initializer=self.init, regularizer=self.reg)
-            b0 = tf.get_variable('bias', (self.q_dim), initializer=tf.constant_initializer(0.0))
+            H0 = tf.get_variable('weights', (self.s_dim, self.q_dim), initializer=self.init, regularizer=self.reg)
+            b0 = tf.get_variable('bias', (1,self.q_dim), initializer=tf.constant_initializer(0.0))
             # We assume that S has the same length as targets
             logits = []
             for i in range(len(S)):
                 s = S[i]
                 # According to the paper, this is how s is used to generate the query
-                init_state = tf.matmul(H0, s) + b0
+                init_state = tf.matmul(s, H0) + b0
                 word_embeddings = tf.nn.embedding_lookup(E, targets[i])
+                word_embeddings = unpack_sequence(word_embeddings)
                 # query words is a length T list of outputs (one for each input), or a nested tuple of such elements.
                 query_words, _ = tf.nn.rnn(cell, word_embeddings, initial_state=init_state)
-                logits.append[query_words]
+                logits.append(pack_sequence(query_words))
     ########################
     # END OF YOUR CODE    #
     #######################
@@ -130,7 +133,7 @@ class HRED(object):
     # PUT YOUR CODE HERE  #
     #######################
     with tf.variable_scope('loss'):
-        W = tf.get_variable("weights", (self.vocab_size, self.o_dim), dtype=tf.float32, initializer=self.init, regularizer=self.reg)
+        W = tf.get_variable("weights", (self.vocab_size, self.q_dim), dtype=tf.float32, initializer=self.init, regularizer=self.reg)
         b = tf.get_variable("bias", (self.vocab_size,), dtype=tf.float32, initializer=tf.constant_initializer(0.0))
         # We need to compute the sampled_softmax_loss using 32bit floats to
         # avoid numerical instabilities.
@@ -147,3 +150,13 @@ class HRED(object):
     #######################
 
     return loss
+    
+def unpack_sequence(tensor):
+    """Split the single tensor of a sequence into a list of frames."""
+    tensor = tf.reshape(tensor, (tensor.get_shape()[0].value, tensor.get_shape()[2].value))
+    return tf.split(0, tensor.get_shape()[0].value, tensor)
+
+def pack_sequence(sequence):
+    """Combine a list of the frames into a single tensor of the sequence."""
+    dim = sequence[0].get_shape()[1].value
+    return tf.reshape(tf.pack(sequence), (len(sequence), dim))
