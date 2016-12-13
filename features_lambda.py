@@ -9,13 +9,13 @@ def getFeatures(m, anchor, suggestions):
     prob_list = []
     prob, prev_state = m.likelhood(suggestions[0], primed_state)
     prob_list.append(prob)
-    for query in suggestion[1:]:
+    for query in suggestions[1:]:
         prob, prev_state = m.likelhood(query, prev_state)
         prob_list.append(prob)
     return prob_list
 
 def aug_data(data):
-    word2index = cPickle.load(open('../data/word2index.p', 'rb'))
+    word2index = cPickle.load(open('../data/word2index.pkl', 'rb'))
     auged_data = []
     for suggestion in data:
         query = word2index[suggestion]
