@@ -65,14 +65,15 @@ def train():
 #    inputs = []
 #    targets = []
     with tf.variable_scope('input'):
-        query = tf.placeholder(tf.int32, shape=[2, 1])
-        target = tf.placeholder(tf.int32, shape=[1, 1])
+        query = tf.placeholder(tf.int32, [10, 2, 1])
+        target = tf.placeholder(tf.int32, [10, 1, 1])
 #        for i in range(_buckets[-1][0]):  # Last bucket is the biggest one.
 #            inputs.append(tf.placeholder(tf.int32, shape=[None], name="input{0}".format(i)))
 #        for i in range(_buckets[-1][1] + 1):
 #            targets.append(tf.placeholder(tf.int32, shape=[None], name="target{0}".format(i)))
     # Data pipeline
-    logits = model.inference([query], [target])
+#    logits = model.inference([query], [target])
+    logits = model.inference(tf.unstack(query, axis=0), [target])
     loss = model.loss(logits, [target])
     # Initialize optimizer
     opt = tf.train.GradientDescentOptimizer(FLAGS.learning_rate)
@@ -87,13 +88,24 @@ def train():
         train_writer = tf.summary.FileWriter(FLAGS.log_dir + '/train', sess.graph)
         test_writer = tf.summary.FileWriter(FLAGS.log_dir + '/test')
         # Initialize variables
-        sess.run(tf.global_variables_initializer())     
+#        sess.run(tf.global_variables_initializer())     
         # Do a loop
         print('[Starting training.]')
+        dummy_set = train_sess[0]
+        dummy_sess = [dummy_set] * 10
         for iteration in range(FLAGS.max_steps):
-        
-            session = train_sess[0] #np.random.choice(train_sess)
-            x, y = np.array(session[-2]).reshape((2,1)), np.array(session[-1]).reshape((1,1))
+            
+#            session = train_sess[0] #np.random.choice(train_sess)
+            sess.run(tf.global_variables_initializer())
+            x = []
+            y = []
+            for pairs in dummy_sess:
+                x.append(np.array(pairs[-2]).reshape((2,1)))
+                y.append(np.array(pairs[-1]).reshape((1,1)))
+            
+#            print(len(session[-1]))
+#            x, y = np.array(session[-2]).reshape((2,1)), np.array(session[-1]).reshape((1,1))
+            
 
 #                # Input feed: encoder inputs, decoder inputs, target_weights, as provided.
 #                encoder_size, decoder_size = self.buckets[bucket_id]
@@ -104,6 +116,7 @@ def train():
 #              input_feed[self.decoder_inputs[l].name] = decoder_inputs[l]
 #              input_feed[self.target_weights[l].name] = target_weights[l]
             # sess.run(y, feed_dict={i: d for i, d in zip(inputs, data)})
+            
             _ = sess.run([opt_operation], feed_dict={query: x, target: y})
             #train_writer.add_summary(summ, iteration)
 #        else:

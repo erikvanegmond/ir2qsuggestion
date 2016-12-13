@@ -34,6 +34,7 @@ class HRED(object):
     
     self.init = initializers.xavier_initializer()
     self.reg = regularizers.l2_regularizer(1e-2)
+    self.counter = 0
 
   def inference(self, session, targets):
     """
@@ -49,7 +50,9 @@ class HRED(object):
     ########################
     # PUT YOUR CODE HERE  #
     #######################
-    with tf.variable_scope('HRED'):        
+    self.counter += 1
+    print(self.counter)
+    with tf.variable_scope('HRED'+str(self.counter)):        
         E = tf.get_variable('embedding', (self.vocab_size, self.q_dim), initializer=self.init, regularizer=self.reg)
         with tf.variable_scope('QueryEncoder'):
             # Create the GRU cell(s)
@@ -61,7 +64,9 @@ class HRED(object):
             # Loop over all the queries to encode them
             Q = []
             #state = tf.zeros([cell.state_size])
+            
             for query in session:
+                print (query)
                 word_embeddings = tf.nn.embedding_lookup(E, query)
                 word_embeddings = unpack_sequence(word_embeddings)
                 _, state = tf.nn.rnn(cell, word_embeddings, dtype=tf.float32)
