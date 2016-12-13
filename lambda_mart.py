@@ -11,26 +11,26 @@ import pandas as pd
 from rankpy.models import LambdaMART
 from rankpy.queries import Queries
 
-hred_use = False
+hred_use = True
 training = True
 
-import features.adj as ad
-import features.cossimilar as cs
-import features.length as lg
-import features.lengthdiff as ld
-import features.levenstein as levs
-if hred_use == True:
-    import features.HRED as hredf
-import features.bg_count as bgcount
-
-adj = ad.ADJ()
-lev = levs.Levenshtein()
-lendif = ld.LengthDiff()
-leng = lg.Length()
-coss = cs.CosineSimilarity()
-if hred_use == True:
-    hred = hredf.HRED()
-bgc = bgcount.BgCount()
+# import features.adj as ad
+# import features.cossimilar as cs
+# import features.length as lg
+# import features.lengthdiff as ld
+# import features.levenstein as levs
+# if hred_use == True:
+#     import features.HRED as hredf
+# import features.bg_count as bgcount
+#
+# adj = ad.ADJ()
+# lev = levs.Levenshtein()
+# lendif = ld.LengthDiff()
+# leng = lg.Length()
+# coss = cs.CosineSimilarity()
+# if hred_use == True:
+#     hred = hredf.HRED()
+# bgc = bgcount.BgCount()
 
 
 def get_query_index_pointers(dataset):
@@ -128,7 +128,7 @@ def lambdaMart(data, data_val, data_test, experiment_string):
     logging.info('Model score')
     scores = model.predict(test_queries)
     print scores
-    rankings,scores = model.predict_rankings(test_queries, return_scores=True)
+    rankings, scores = model.predict_rankings(test_queries, return_scores=True)
     mean_rank = np.mean([1 / (r[i] + 1) for i, r in izip(indexes_ones, rankings)])
 
     text_file.write("LambarMART MRR: %s" % mean_rank)
