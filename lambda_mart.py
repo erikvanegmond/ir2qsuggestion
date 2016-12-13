@@ -8,10 +8,11 @@ from itertools import izip
 
 import numpy as np
 import pandas as pd
-#from rankpy.models import LambdaMART
-#from rankpy.queries import Queries
+from rankpy.models import LambdaMART
+from rankpy.queries import Queries
 
-hred_use = True
+hred_use = False
+training = True
 
 import features.adj as ad
 import features.cossimilar as cs
@@ -43,7 +44,7 @@ def get_query_index_pointers(dataset):
     return query_index_pointers
 
 
-def lambdaMart(data, experiment_string):
+def lambdaMart(data, data_val, data_test, experiment_string):
     # Turn on logging.
     logging.basicConfig(format='%(asctime)s : %(message)s', level=logging.INFO)
 
@@ -52,6 +53,8 @@ def lambdaMart(data, experiment_string):
 #     20% validation
 #     25% test
     query_index_pointers = get_query_index_pointers(data[:, 0])
+    query_index_pointers_val = get_query_index_pointers(data_val[:, 0])
+    query_index_pointers_test = get_query_index_pointers(data_test[:, 0])
 
 #    train_part_pointer = int(math.floor(query_index_pointers.shape[0] * 0.55))
 #    training_pointers, test_val_pointers = query_index_pointers[:train_part_pointer], query_index_pointers[
@@ -72,61 +75,70 @@ def lambdaMart(data, experiment_string):
 
 #     Set them to queries
     logging.info('Creating Training queries')
+
     training_targets = pd.DataFrame(data[:, :1]).astype(np.float32)
     training_features = pd.DataFrame(data[:, 1:]).astype(np.float32)
     training_queries = Queries(training_features, training_targets, query_index_pointers)
 
-#    logging.info('Creating Validation queries')
-#    validation_targets = pd.DataFrame(validation_queries[:, :1]).astype(np.float32)
-#    validation_features = pd.DataFrame(validation_queries[:, 1:]).astype(np.float32)
-#    validation_pointers = validation_pointers - upper_bound_train
-#    validation_queries = Queries(validation_features, validation_targets, validation_pointers)
-#
-#    logging.info('Creating Test queries')
-#    test_targets = pd.DataFrame(test_queries[:, :1]).astype(np.float32)
-#    test_features = pd.DataFrame(test_queries[:, 1:]).astype(np.float32)
-#    test_pointers = test_pointers - (upper_bound_val)
-#    test_queries = Queries(test_features, test_targets, test_pointers)
+    validation_targets = pd.DataFrame(data_val[:, :1]).astype(np.float32)
+    validation_features = pd.DataFrame(data_val[:, 1:]).astype(np.float32)
+    validation_queries = Queries(validation_features, validation_targets, query_index_pointers_val)
+
+    test_targets = pd.DataFrame(data_test[:, :1]).astype(np.float32)
+    test_features = pd.DataFrame(data_test[:, 1:]).astype(np.float32)
+    test_queries = Queries(test_features, test_targets, query_index_pointers_test)
 
     logging.info('================================================================================')
 
 #     Print basic info about query datasets.
     logging.info('Train queries: %s' % training_queries)
-#    logging.info('Valid queries: %s' % validation_queries)
-#    logging.info('Test queries: %s' % test_queries)
+    logging.info('Valid queries: %s' % validation_queries)
+    logging.info('Test queries: %s' % test_queries)
 
     logging.info('================================================================================')
 
     model = LambdaMART(metric='nDCG@20', n_estimators=30, subsample=0.5)
+    if training:
+        model.fit(training_queries, validation_queries=validation_queries)
+    else:
+        model.load('../models/LambdaMART_next_query_HREDnDCG@20')
     logging.info("[Created model, starting training...]")
-    model.fit(training_queries)#, validation_queries=validation_queries)
+
 
     logging.info('================================================================================')
 
-#    logging.info('%s on the test queries: %.8f'
-#                 % (model.metric, model.evaluate(test_queries, n_jobs=-1)))
-#
-#    test_set = data[upper_bound_val:, :]
-#    test_set_length = test_set.shape[0]
-#    test_set_targets = test_set[:, :1]
-#    logging.info('ADJ score')
-#    test_indices = test_set_length/20
-#    rankings = [np.arange(20) for i in range(test_indices)]
-#
-#
-#    indexes_ones = [q % 20 for q, [x] in enumerate(test_set_targets) if x == 1.0]
-#    mean_rank = np.mean([1/(r[i]+1) for i,r in izip(indexes_ones, rankings)])
-#    logging.info('MRR: %s' % mean_rank)
-#
-#    logging.info('================================================================================')
-#
-#    logging.info('Model score')
-#    rankings = model.predict_rankings(test_queries)
-#    mean_rank = np.mean([1 / (r[i] + 1) for i, r in izip(indexes_ones, rankings)])
-#    logging.info('MRR: %s' % mean_rank)
+    logging.info('%s on the test queries: %.8f'
+                 % (model.metric, model.evaluate(test_queries, n_jobs=-1)))
+
+    test_set_length = data_test.shape[0]
+    logging.info('ADJ score')
+    test_indices = test_set_length/20
+    rankings = [np.arange(20) for _ in range(test_indices)]
+
+    indexes_ones = [q % 20 for q, [x] in enumerate(data_test[:, :1]) if x == 1.0]
+    mean_rank = np.mean([1/(r[i]+1) for i, r in izip(indexes_ones, rankings)])
+
+    text_file = open("Results" + experiment_string + ".txt", "w")
+
+    text_file.write("ADJ MRR: %s" % mean_rank)
+    logging.info('MRR: %s' % mean_rank)
+
+    logging.info('================================================================================')
+
+    logging.info('Model score')
+    scores = model.predict(test_queries)
+    print scores
+    rankings,scores = model.predict_rankings(test_queries, return_scores=True)
+    mean_rank = np.mean([1 / (r[i] + 1) for i, r in izip(indexes_ones, rankings)])
+
+    text_file.write("LambarMART MRR: %s" % mean_rank)
+
+    logging.info('MRR: %s' % mean_rank)
+
     print('[Done training, saving model...]')
     model.save('../models/LambdaMART_' + experiment_string + model.metric)
     print("Done with experiment" + experiment_string)
+    text_file.close()
 
 
 def create_features(anchor_query, session):
