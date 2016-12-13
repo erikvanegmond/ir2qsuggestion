@@ -10,7 +10,7 @@ file_name_test = '../data/lamdamart_data_next_query_test.csv'
 
 time = datetime.now().strftime('%d-%m %H:%M:%S')
 print("[%s: Loading sessions feature file...]" % time)
-if os.path.isfile(file_name):
+if os.path.isfile(file_name) and os.path.isfile(file_name_val) and os.path.isfile(file_name_test):
     df = pd.read_csv(file_name)
     df_val = pd.read_csv(file_name_val)
     df_test = pd.read_csv(file_name_test)
