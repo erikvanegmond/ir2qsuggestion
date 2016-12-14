@@ -19,7 +19,7 @@ import utils
 LEARNING_RATE_DEFAULT = 2e-3
 BATCH_SIZE_DEFAULT = 200
 MAX_STEPS_DEFAULT = 1500
-EVAL_FREQ_DEFAULT = 100
+EVAL_FREQ_DEFAULT = 10
 CHECKPOINT_FREQ_DEFAULT = 5000
 PRINT_FREQ_DEFAULT = 10
 Q_DIM_DEFAULT = 1000
@@ -28,8 +28,8 @@ VOCAB_DIM_DEFAULT = 90004
 NUM_LAYERS_DEFAULT = 1
 PADDING_DEFAULT = 50
 # Directory for tensorflow logs
-LOG_DIR_DEFAULT = './logs'
-CHECKPOINT_DIR_DEFAULT = './checkpoints'
+LOG_DIR_DEFAULT = '../logs'
+CHECKPOINT_DIR_DEFAULT = '../checkpoints'
 ### --- END default constants---
 
 # We use a number of buckets and pad to the closest one for efficiency.
@@ -62,91 +62,81 @@ def make_example(sequence, labels):
 def train():
     snizer = Sessionizer()
     train_sess = snizer.get_sessions_with_numbers()
-    #snizer = Sessionizer('../data/val_session')
-    #val_sess = snizer.get_sessions_with_numbers()
+    snizer = Sessionizer('../data/val_session')
+    val_sess = snizer.get_sessions_with_numbers()
     # Create model
     model = HRED(FLAGS.vocab_dim, FLAGS.q_dim, FLAGS.s_dim, FLAGS.num_layers)
     print('[Model was created.]')
     # Feeds for inputs.
-#    inputs = []
-#    targets = []
     with tf.variable_scope('input'):
-#        query = tf.placeholder(tf.int32, [10, 2, 1])
-#        target = tf.placeholder(tf.int32, [10, 1, 1])
         query = tf.placeholder(tf.int32, [FLAGS.padding,])
         dec_input = tf.placeholder(tf.int32, [FLAGS.padding,])
         target = tf.placeholder(tf.int32, [FLAGS.padding,])
         s0 = tf.placeholder(tf.float32, [1, FLAGS.s_dim])
-#        for i in range(_buckets[-1][0]):  # Last bucket is the biggest one.
-#            inputs.append(tf.placeholder(tf.int32, shape=[None], name="input{0}".format(i)))
-#        for i in range(_buckets[-1][1] + 1):
-#            targets.append(tf.placeholder(tf.int32, shape=[None], name="target{0}".format(i)))
     # Data pipeline
     logits, S = model.inference(query, dec_input, s0)
     loss = model.loss(logits, target)
     # Initialize optimizer
     opt = tf.train.RMSPropOptimizer(FLAGS.learning_rate)
     opt_operation = opt.minimize(loss)
-    #opt_operation = train_step(losses)
     # Create a saver.
     saver = tf.train.Saver()
     
     with tf.Session() as sess:
         # Initialize summary writers
-        merged = tf.merge_all_summaries()
+#        merged = tf.merge_all_summaries()
         train_writer = []#tf.summary.FileWriter(FLAGS.log_dir + '/train', sess.graph)
-        test_writer = tf.summary.FileWriter(FLAGS.log_dir + '/test')
+        test_writer = []#tf.summary.FileWriter(FLAGS.log_dir + '/test')
         # Initialize variables
         sess.run(tf.global_variables_initializer())     
         # Do a loop
         start_time = datetime.now()
         time = start_time.strftime('%d-%m %H:%M:%S')
         print('[%s: Starting training.]' % time)
-#        dummy_set = train_sess[0]
-#        dummy_sess = [dummy_set] * 10
+        num_examples_seen = 0
         for iteration in range(FLAGS.max_steps):
-            
+            # Select a random session to train on.
             session = np.random.choice(train_sess)
             state = np.zeros((1,FLAGS.s_dim))
             losses = []
             for i in range(len(session)-1):
+                # Loop over the session and predict each query using the previous ones
                 x1 = pad_query(session[i], pad_size=FLAGS.padding)
                 x2 = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='dec_input')
                 y = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='target')
             
                 _, state, l = sess.run([opt_operation, S, loss], feed_dict={query: x1, dec_input: x2, target: y, s0: state})
                 losses.append(l)
+                num_examples_seen += 1
+            # Append the loss of this session to the training data
             train_writer.append(np.mean(losses))
-            time = datetime.now().strftime('%d-%m %H:%M:%S')
-            print('[%s: Trained on a session of length %d. It has a loss of: %f]' % (time, len(session), train_writer[iteration]))
-
-#                # Input feed: encoder inputs, decoder inputs, target_weights, as provided.
-#                encoder_size, decoder_size = self.buckets[bucket_id]
-#            input_feed = {}
-#            for l in xrange(encoder_size):
-#              input_feed[self.encoder_inputs[l].name] = encoder_inputs[l]
-#            for l in xrange(decoder_size):
-#              input_feed[self.decoder_inputs[l].name] = decoder_inputs[l]
-#              input_feed[self.target_weights[l].name] = target_weights[l]
-            # sess.run(y, feed_dict={i: d for i, d in zip(inputs, data)})
-            #train_writer.add_summary(summ, iteration)
-#        else:
-#        _ = sess.run([opt_operation], feed_dict={x: x_data, y: y_data})
-#        
-#            if iteration % FLAGS.eval_freq == 0 or iteration == FLAGS.max_steps - 1:
-#                print('%s iterations' % iteration)
-#                x_val, y_val = cifar10.test.images, cifar10.test.labels
-#        
-#                summary, accuracy_test = sess.run([merged, acc], feed_dict={x: x_val, y: y_val})
-#                test_writer.add_summary(summary, iteration)
-#                
-#                print('Test accuracy at step %s: %s' % (iteration, accuracy_test))
-#        
-#            if iteration % FLAGS.checkpoint_freq == 0 or iteration == FLAGS.max_steps - 1:
-#                file_name = FLAGS.checkpoint_dir + '/model.ckpt'
-#                saver.save(sess, file_name)
-    train_writer.close()
-    test_writer.close()
+            # Evaluate the model
+            if iteration % FLAGS.eval_freq == 0 or iteration == FLAGS.max_steps - 1:
+                val_losses = []
+                # Loop over all the sessions in the validation set
+                for session in val_sess:
+                    state = np.zeros((1,FLAGS.s_dim))
+                    losses = []
+                    for i in range(len(session)-1):
+                        x1 = pad_query(session[i], pad_size=FLAGS.padding)
+                        x2 = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='dec_input')
+                        y = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='target')
+                    
+                        state, l = sess.run([S, loss], feed_dict={query: x1, dec_input: x2, target: y, s0: state})
+                        losses.append(l)
+                    val_losses.append(np.mean(losses))
+                test_writer.append(np.mean(val_losses))
+                print('Train loss at step %s: %f.' % (iteration, train_writer[-1]))
+                print('Test loss at step %s: %f.' % (iteration, test_writer[-1]))
+                print('Number of examples seen: %s' % num_examples_seen)
+                print('-' * 40)
+                # Save the loss data so that we can plot it later
+                np.save(open(FLAGS.log_dir + '/train.pnz', 'w'), np.array(train_writer))
+                np.save(open(FLAGS.log_dir + '/test.pnz', 'w'), np.array(test_writer))
+            # Save the model
+            if iteration % FLAGS.checkpoint_freq == 0 or iteration == FLAGS.max_steps - 1:
+                file_name = FLAGS.checkpoint_dir + '/HRED_model.ckpt'
+                saver.save(sess, file_name)
     
 def pad_query(query, pad_size=50, q_type='input'):
     """
@@ -159,14 +149,24 @@ def pad_query(query, pad_size=50, q_type='input'):
     Returns:
       pad_query: a list of indices representing the padded query
     """
-    if q_type == 'input':
-        pad_query = np.array(query + [utils.PAD_ID] * (pad_size - len(query)))
-    elif q_type == 'dec_input':
-        pad_query = np.array([utils.GO_ID] + query + [utils.PAD_ID] * (pad_size - len(query) - 1))
-    elif q_type == 'target':
-        pad_query = np.array(query + [utils.EOS_ID] + [utils.PAD_ID] * (pad_size - len(query) - 1))
+    if len(query) < pad_size:
+        if q_type == 'input':
+            pad_query = np.array(query + [utils.PAD_ID] * (pad_size - len(query)))
+        elif q_type == 'dec_input':
+            pad_query = np.array([utils.GO_ID] + query + [utils.PAD_ID] * (pad_size - len(query) - 1))
+        elif q_type == 'target':
+            pad_query = np.array(query + [utils.EOS_ID] + [utils.PAD_ID] * (pad_size - len(query) - 1))
+        else:
+            pad_query = None
     else:
-        pad_query = None
+        if q_type == 'input':
+            pad_query = np.array(query[:pad_size])
+        elif q_type == 'dec_input':
+            pad_query = np.array([utils.GO_ID] + query[:pad_size-1])
+        elif q_type == 'target':
+            pad_query = np.array(query[:pad_size-1] + [utils.EOS_ID])
+        else:
+            pad_query = None
         
     return pad_query
     
