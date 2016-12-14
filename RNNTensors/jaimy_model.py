@@ -50,11 +50,9 @@ class HRED(object):
     ########################
     # PUT YOUR CODE HERE  #
     #######################
-    self.counter += 1
-    print(self.counter)
-    with tf.variable_scope('HRED'+str(self.counter)):        
+    with tf.variable_scope('HRED'):        
         E = tf.get_variable('embedding', (self.vocab_size, self.q_dim), initializer=self.init, regularizer=self.reg)
-        with tf.variable_scope('QueryEncoder'):
+        with tf.variable_scope('QueryEncoder') as q_enc:
             # Create the GRU cell(s)
             single_cell = tf.nn.rnn_cell.GRUCell(self.q_dim)
             if self.num_layers > 1:
@@ -62,16 +60,14 @@ class HRED(object):
             else:
                 cell = single_cell
             # Loop over all the queries to encode them
-            Q = []
-            #state = tf.zeros([cell.state_size])
-            
+            Q = []            
             for query in session:
-                print (query)
                 word_embeddings = tf.nn.embedding_lookup(E, query)
                 word_embeddings = unpack_sequence(word_embeddings)
                 _, state = tf.nn.rnn(cell, word_embeddings, dtype=tf.float32)
                 Q.append(state)
-        with tf.variable_scope('SessionEncoder'):
+                q_enc.reuse_variables()
+        with tf.variable_scope('SessionEncoder') as s_enc:
             # Create the GRU cell(s)
             single_cell = tf.nn.rnn_cell.GRUCell(self.s_dim)
             if self.num_layers > 1:
@@ -86,10 +82,11 @@ class HRED(object):
                     queries = Q[:i+1]
                     _, s = tf.nn.rnn(cell, queries, dtype=tf.float32)
                     S.append(s)
+                    s_enc.reuse_variables()
             else:
                 # When we're not training we only want to predict the last query
                 _, [S] = tf.nn.rnn(cell, Q)
-        with tf.variable_scope('Decoder'):
+        with tf.variable_scope('Decoder') as dec:
             # Create the GRU cell(s)
             single_cell = tf.nn.rnn_cell.GRUCell(self.q_dim)
             if self.num_layers > 1:
@@ -109,6 +106,7 @@ class HRED(object):
                 # query words is a length T list of outputs (one for each input), or a nested tuple of such elements.
                 query_words, _ = tf.nn.rnn(cell, word_embeddings, initial_state=init_state)
                 logits.append(pack_sequence(query_words))
+                dec.reuse_variables()
     ########################
     # END OF YOUR CODE    #
     #######################
@@ -158,7 +156,11 @@ class HRED(object):
     
 def unpack_sequence(tensor):
     """Split the single tensor of a sequence into a list of frames."""
-    tensor = tf.reshape(tensor, (tensor.get_shape()[0].value, tensor.get_shape()[2].value))
+    try:
+        tensor = tf.reshape(tensor, (tensor.get_shape()[0].value, tensor.get_shape()[2].value))
+    except ValueError:
+        print(tensor.get_shape())
+        raise
     return tf.split(0, tensor.get_shape()[0].value, tensor)
 
 def pack_sequence(sequence):

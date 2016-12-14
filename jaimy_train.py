@@ -65,7 +65,7 @@ def train():
 #    inputs = []
 #    targets = []
     with tf.variable_scope('input'):
-        query = tf.placeholder(tf.int32, [10, 2, 1])
+        session = tf.placeholder(tf.int32, [10, 2, 1])
         target = tf.placeholder(tf.int32, [10, 1, 1])
 #        for i in range(_buckets[-1][0]):  # Last bucket is the biggest one.
 #            inputs.append(tf.placeholder(tf.int32, shape=[None], name="input{0}".format(i)))
@@ -73,8 +73,8 @@ def train():
 #            targets.append(tf.placeholder(tf.int32, shape=[None], name="target{0}".format(i)))
     # Data pipeline
 #    logits = model.inference([query], [target])
-    logits = model.inference(tf.unstack(query, axis=0), [target])
-    loss = model.loss(logits, [target])
+    logits = model.inference(tf.unstack(session, axis=0), tf.unstack(target, axis=0))
+    loss = model.loss(logits, tf.unstack(target, axis=0))
     # Initialize optimizer
     opt = tf.train.GradientDescentOptimizer(FLAGS.learning_rate)
     opt_operation = opt.minimize(loss)
