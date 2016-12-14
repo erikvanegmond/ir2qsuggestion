@@ -30,7 +30,7 @@ sessions = lm.adj.find_suitable_sessions("../data/lm_val_sessions.pkl")
 # for each session:
 def create_next_query_csv():
     print('[Creating dataset for next_query predictions.]')
-    experiment_string = "next_query_val"
+    experiment_string = "next_query_val_short"
     print("Performing experiment: " + experiment_string)
     lm.next_query_prediction(sessions, experiment_string)
     print("---" * 30)
@@ -58,5 +58,5 @@ def create_longtail_query_csv():
 
 print('[Creating validation features.]')
 create_next_query_csv()
-create_noisy_query_csv()
-create_longtail_query_csv()
+# create_noisy_query_csv()
+# create_longtail_query_csv()

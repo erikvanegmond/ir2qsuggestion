@@ -52,7 +52,8 @@ def lambdaMart(data, data_val, data_test, experiment_string):
 #     55% train
 #     20% validation
 #     25% test
-    query_index_pointers = get_query_index_pointers(data[:, 0])
+    query_index_pointers = get_query_index_pointers(data[:10000, 0])
+    print(query_index_pointers.shape)
     query_index_pointers_val = get_query_index_pointers(data_val[:, 0])
     query_index_pointers_test = get_query_index_pointers(data_test[:, 0])
 
@@ -76,8 +77,10 @@ def lambdaMart(data, data_val, data_test, experiment_string):
 #     Set them to queries
     logging.info('Creating Training queries')
 
-    training_targets = pd.DataFrame(data[:, :1]).astype(np.float32)
-    training_features = pd.DataFrame(data[:, 1:]).astype(np.float32)
+    training_targets = pd.DataFrame(data[:10000, :1]).astype(np.float32)
+    print(training_targets.shape)
+    training_features = pd.DataFrame(data[:10000, 1:]).astype(np.float32)
+    print(training_features.shape)
     training_queries = Queries(training_features, training_targets, query_index_pointers)
 
     validation_targets = pd.DataFrame(data_val[:, :1]).astype(np.float32)
@@ -87,6 +90,7 @@ def lambdaMart(data, data_val, data_test, experiment_string):
     test_targets = pd.DataFrame(data_test[:, :1]).astype(np.float32)
     test_features = pd.DataFrame(data_test[:, 1:]).astype(np.float32)
     test_queries = Queries(test_features, test_targets, query_index_pointers_test)
+
 
     logging.info('================================================================================')
 
@@ -112,11 +116,11 @@ def lambdaMart(data, data_val, data_test, experiment_string):
 
     test_set_length = data_test.shape[0]
     logging.info('ADJ score')
-    test_indices = test_set_length/20
+    test_indices = test_set_length/20.0
     rankings = [np.arange(20) for _ in range(test_indices)]
 
     indexes_ones = [q % 20 for q, [x] in enumerate(data_test[:, :1]) if x == 1.0]
-    mean_rank = np.mean([1/(r[i]+1) for i, r in izip(indexes_ones, rankings)])
+    mean_rank = np.mean([1/(r[i]+1.0) for i, r in izip(indexes_ones, rankings)])
 
     text_file = open("Results" + experiment_string + ".txt", "w")
 
@@ -127,9 +131,9 @@ def lambdaMart(data, data_val, data_test, experiment_string):
 
     logging.info('Model score')
     scores = model.predict(test_queries)
-    print scores
+    # print scores
     rankings, scores = model.predict_rankings(test_queries, return_scores=True)
-    mean_rank = np.mean([1 / (r[i] + 1) for i, r in izip(indexes_ones, rankings)])
+    mean_rank = np.mean([1 / (r[i] + 1.0) for i, r in izip(indexes_ones, rankings)])
 
     text_file.write("LambarMART MRR: %s" % mean_rank)
 
@@ -228,6 +232,7 @@ def next_query_prediction(sessions, experiment_string):
             used_sess += 1
         if used_sess % 1000 == 0:
             print("[Visited %s anchor queries.]" % used_sess)
+            break
     lambda_dataframe = pd.DataFrame(data=np.transpose(lambdamart_data), columns=headers)
     lambda_dataframe.to_csv('../data/lamdamart_data_' + experiment_string + '.csv')
     print("---" * 30)
