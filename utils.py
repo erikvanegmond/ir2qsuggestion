@@ -1,24 +1,44 @@
-import cPickle as pickle
+import pickle
 import numpy as np
 import features.adj as adj
 from datetime import datetime
-from model.model import Model
-from sessionizer import Sessionizer
+#from model.model import Model
 
 word2index = pickle.load( open( "../data/word2index.p", "rb" ) )
+index2word = pickle.load( open( "../data/index2word.p", "rb" ) )
+# Special vocabulary symbols - we always put them at the start.
+_PAD = '<pad>'
+_GO = '<go>'
+_EOS = '<eos>'
+_UNK = '<unk>'
+
+PAD_ID = 1
+GO_ID = 2
+EOS_ID = 3
+UNK_ID = 0
 
 def create_word_mappings():
-    print 'Loading aol_vocab.dict.pkl...'
+    print('Loading aol_vocab.dict.pkl...')
     vocab = pickle.load(open('../data/aol_vocab.dict.pkl', 'rb'))
-    print 'Creating mappings for %s words...' % len(vocab)
-    word2index = {w:n1 for w, n1, n2 in vocab}
-    index2word = {n1:w for w, n1, n2 in vocab}
-    start_symbol_idx = max(index2word.keys())+1
-    index2word[start_symbol_idx] = '<q>'
-    word2index['<q>'] = start_symbol_idx
-    print 'Saving to word2index.p...'
+    print('Creating mappings for %s words...' % len(vocab))
+    word2index = {}
+    index2word = {}
+    for w, n1, n2 in vocab:
+        if n1 == PAD_ID:
+            word2index[_PAD] = PAD_ID
+            index2word[PAD_ID] = _PAD
+        elif n1 == GO_ID:
+            word2index[_GO] = GO_ID
+            index2word[GO_ID] = _GO
+        elif n1 == EOS_ID:
+            word2index[_EOS] = EOS_ID
+            index2word[EOS_ID] = _EOS
+        else:
+            word2index[w] = n1
+            index2word[n1] = w
+    print('Saving to word2index.p...')
     pickle.dump(word2index, open('../data/word2index.p', 'wb'))
-    print 'Saving to index2word.p...'
+    print('Saving to index2word.p...')
     pickle.dump(index2word, open('../data/index2word.p', 'wb'))
 
 def create_test_train(data, test_size):
@@ -55,7 +75,7 @@ def append_start_stop_num(sessions, name):
             sessions_counter += 1
             # Store the data every 100.000 sessions.
             if sessions_counter % 100000 == 0:
-                print '%s sessions. Parsed %d queries. %f sessions skipped.' % (sessions_counter, queries, bad_sessions)
+                print('%s sessions. Parsed %d queries. %f sessions skipped.' % (sessions_counter, queries, bad_sessions))
         else:
             bad_sessions += 1
     with open('../data/aug_'+ name + '.pkl', 'wb') as f:

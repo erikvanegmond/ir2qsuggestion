@@ -22,7 +22,7 @@ class Ranker(object):
             Ranker.bg_sessions = Ranker.bg_sessionizer.get_sessions()
             Ranker.query_counts = Counter(list(itertools.chain.from_iterable(Ranker.bg_sessions)))
         else:
-            print "don't have to get the sessions as we already have them"
+            print("don't have to get the sessions as we already have them")
 
         if not Ranker.w2n:
             pkl_file = open(vocab_file, 'rb')

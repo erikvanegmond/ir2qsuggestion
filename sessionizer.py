@@ -15,7 +15,7 @@ class Sessionizer(object):
         print("locating sessions " + self.data_path)
         self.sessions = []
         self.number_sessions = []
-        with open(self.data_path + ".ctx") as ctx, open(self.data_path + ".out") as out:
+        with open(self.data_path + ".ctx", 'r') as ctx, open(self.data_path + ".out", 'r') as out:
             for ctx_line, out_line in zip(ctx, out):
                 queries = ctx_line.rstrip('\n').split('\t')
                 if len(set(queries)) > 1:

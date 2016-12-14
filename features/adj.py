@@ -1,7 +1,7 @@
 import os
 from collections import defaultdict, Counter
 from features.ranker import Ranker
-import cPickle as pkl
+import pickle as pkl
 from datetime import datetime
 import numpy as np
 
@@ -85,7 +85,7 @@ class ADJ(Ranker):
                 ADJ.suitable_sessions.append(session)
 
             if i % 120 == 0:
-                print 'checked session {}, at {}%'.format(i, np.round(i / l * 100))
+                print('checked session {}, at {}%'.format(i, np.round(i / l * 100)))
         time = datetime.now().strftime('%d-%m %H:%M:%S')
         print("[%s: Saving file...]" % time)
         pkl_file = open(suitable_sessions_fname, 'wb')
