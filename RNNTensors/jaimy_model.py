@@ -9,6 +9,8 @@ import tensorflow as tf
 from tensorflow.contrib.layers import initializers
 from tensorflow.contrib.layers import regularizers
 
+import utils
+
 class HRED(object):
   """
   This class implements a Multilayer Perceptron in Tensorflow.
@@ -81,21 +83,20 @@ class HRED(object):
             # Get/create the variables
             H0 = tf.get_variable('weights', (self.s_dim, self.q_dim), initializer=self.init, regularizer=self.reg)
             b0 = tf.get_variable('bias', (1, self.q_dim), initializer=tf.constant_initializer(0.0))
+            Ho = tf.get_variable('omega_Hweights', (self.q_dim, self.o_dim), initializer=self.init, regularizer=self.reg)
+            Eo = tf.get_variable('omega_Eweights', (self.q_dim, self.o_dim), initializer=self.init, regularizer=self.reg)
+            bo = tf.get_variable('omega_bias', (1, self.o_dim), initializer=tf.constant_initializer(0.0))
+            O = tf.get_variable('embedding', (self.o_dim, self.vocab_size), initializer=self.init, regularizer=self.reg)
             # According to the paper, this is how s is used to generate the query
             state = tf.tanh(tf.matmul(S, H0) + b0)
             word_embeddings = tf.nn.embedding_lookup(E, target)
             word_embeddings = tf.split(0, word_embeddings.get_shape()[0].value, word_embeddings)
             D = []
-            for word in word_embeddings:              
-                _, state = cell(word, state)
+            for word in word_embeddings:    
                 D.append(state)                
+                _, state = cell(word, state)          
                 dec.reuse_variables()
-            # We add a final linear layer to create the output            
-            Ho = tf.get_variable('omega_Hweights', (self.q_dim, self.o_dim), initializer=self.init, regularizer=self.reg)
-            Eo = tf.get_variable('omega_Eweights', (self.q_dim, self.o_dim), initializer=self.init, regularizer=self.reg)
-            bo = tf.get_variable('omega_bias', (1, self.o_dim), initializer=tf.constant_initializer(0.0))
-            O = tf.get_variable('embedding', (self.o_dim, self.vocab_size), initializer=self.init, regularizer=self.reg)
-            
+            # We add a final linear layer to create the output                        
             D = pack_sequence(D)
             W = pack_sequence(word_embeddings)
             omega = tf.matmul(D, Ho) + tf.matmul(W, Eo) + bo
@@ -108,7 +109,7 @@ class HRED(object):
     """
     Calculates the sofmax loss using sampling. 
     Args:
-      logits: A list of 2D float Tensor of size [num_words, self.q_dim].
+      logits: A list of 2D float Tensor of size [num_words, self.vocab_size].
       labels: A list of 2D int Tensor of size [num_words, 1] containing the true words of the sequence
     Returns:
       loss: scalar float Tensor, full loss = cross_entropy + reg_loss
@@ -120,19 +121,53 @@ class HRED(object):
         lbls = tf.one_hot(labels, self.vocab_size, axis=-1)
         inpts = tf.cast(logits, tf.float32)
         softmax_loss = tf.nn.softmax_cross_entropy_with_logits(inpts, lbls)
-        tf.scalar_summary('softmax loss', softmax_loss)
+        softmax_loss = tf.reduce_mean(softmax_loss)
+        tf.summary.scalar('softmax loss', softmax_loss)
         
         reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
         reg_loss = tf.reduce_sum(reg_losses)
-        tf.scalar_summary('regularization loss', reg_loss)
+        tf.summary.scalar('regularization loss', reg_loss)
         
         loss = tf.add(softmax_loss, reg_loss)
-        tf.scalar_summary('total loss', loss)
+        tf.summary.scalar('total loss', loss)
     ########################
     # END OF YOUR CODE    #
     #######################
 
     return loss
+    
+  def accuracy(self, logits, labels):
+    """
+    Calculate the prediction accuracy, i.e. the average correct predictions
+    of the network.
+    As in self.loss above, you can use tf.scalar_summary to save
+    scalar summaries of accuracy for later use with the TensorBoard.
+
+    Args:
+      logits: 2D float Tensor of size [num_words, self.vocab_size].
+                   The predictions returned through self.inference.
+      labels: 2D int Tensor of size [num_words, 1]
+                 with one-hot encoding. Ground truth labels for
+                 each observation in batch.
+
+    Returns:
+      accuracy: scalar float Tensor, the accuracy of predictions,
+                i.e. the average correct predictions over the whole batch.
+    """
+    ########################
+    # PUT YOUR CODE HERE  #
+    ########################
+    with tf.name_scope('accuracy'):
+      preds = tf.nn.softmax(logits)
+      correct_prediction = tf.cast(tf.equal(tf.cast(tf.argmax(preds,1), tf.int32), labels), tf.float32)
+      query_len = tf.reduce_sum(tf.cast(tf.not_equal(labels, utils.PAD_ID), tf.int32))
+      accuracy = tf.reduce_mean(correct_prediction[:query_len])/tf.cast(query_len, tf.float32)
+      tf.summary.scalar('accuracy', accuracy)
+    ########################
+    # END OF YOUR CODE    #
+    ########################
+
+    return accuracy
     
 def unpack_sequence(tensor):
     """Split the single tensor of a sequence into a list of frames."""

@@ -20,7 +20,7 @@ import utils
 LEARNING_RATE_DEFAULT = 2e-3
 MAX_STEPS_DEFAULT = 1500
 EVAL_FREQ_DEFAULT = 100
-CHECKPOINT_FREQ_DEFAULT = 5000
+CHECKPOINT_FREQ_DEFAULT = 1000
 PRINT_FREQ_DEFAULT = 10
 Q_DIM_DEFAULT = 1000
 S_DIM_DEFAULT = 1500
@@ -55,6 +55,7 @@ def train():
     # Data pipeline
     logits, S = model.inference(query, dec_input, s0)
     loss = model.loss(logits, target)
+    acc = model.accuracy(logits, target)
     # Initialize optimizer
     opt = tf.train.RMSPropOptimizer(FLAGS.learning_rate)
     opt_operation = opt.minimize(loss)
@@ -63,11 +64,15 @@ def train():
     
     with tf.Session() as sess:
         # Initialize summary writers
-#        merged = tf.merge_all_summaries()
+        merged = tf.merge_all_summaries()
+        writer = tf.summary.FileWriter(FLAGS.log_dir, sess.graph)
         train_writer = []#tf.summary.FileWriter(FLAGS.log_dir + '/train', sess.graph)
         test_writer = []#tf.summary.FileWriter(FLAGS.log_dir + '/test')
         # Initialize variables
-        sess.run(tf.global_variables_initializer())     
+        if FLAGS.resume:
+            saver.restore(sess, tf.train.latest_checkpoint(FLAGS.checkpoint_dir))
+        else:
+            sess.run(tf.global_variables_initializer())     
         # Do a loop
         start_time = datetime.now()
         time = start_time.strftime('%d-%m %H:%M:%S')
@@ -83,13 +88,18 @@ def train():
                 x1 = pad_query(session[i], pad_size=FLAGS.padding)
                 x2 = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='dec_input')
                 y = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='target')
-            
-                _, state, l = sess.run([opt_operation, S, loss], feed_dict={query: x1, dec_input: x2, target: y, s0: state})
+                
+                if i == len(session)-2:
+                    # We're at the anchor query of this session
+                    _, l, summary = sess.run([opt_operation, loss, merged], feed_dict={query: x1, dec_input: x2, target: y, s0: state})
+                    writer.add_summary(summary, iteration)
+                else:
+                    _, state, l = sess.run([opt_operation, S, loss], feed_dict={query: x1, dec_input: x2, target: y, s0: state})
                 losses.append(l)
                 num_examples_seen += 1
             # Append the loss of this session to the training data
             train_writer.append(np.mean(losses))
-            if iteration % FLAGS.print_freq == 0:
+            if (iteration+1) % FLAGS.print_freq == 0:
                 print('Visited %s examples of %s sessions. Loss: %f' % (num_examples_seen, iteration+1, train_writer[-1]))
             # Evaluate the model
             if iteration % FLAGS.eval_freq == 0 or iteration == FLAGS.max_steps - 1:
@@ -103,28 +113,28 @@ def train():
                         x2 = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='dec_input')
                         y = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='target')
                     
-                        state, l = sess.run([S, loss], feed_dict={query: x1, dec_input: x2, target: y, s0: state})
+                        state, l, accuracy = sess.run([S, loss, acc], feed_dict={query: x1, dec_input: x2, target: y, s0: state})
                         losses.append(l)
                     val_losses.append(np.mean(losses))
                 test_writer.append(np.mean(val_losses))
                 print('-' * 40)
                 print('Train loss at step %s: %f.' % (iteration, train_writer[-1]))
-                print('Test loss at step %s: %f.' % (iteration, test_writer[-1]))
+                print('Test loss at step %s: %f. Accuracy: %f' % (iteration, test_writer[-1], accuracy))
                 print('Number of examples seen: %s' % num_examples_seen)
                 print('-' * 40)
+                break
                 # Save the loss data so that we can plot it later
                 np.save(FLAGS.log_dir + '/train', np.array(train_writer))
                 np.save(FLAGS.log_dir + '/test', np.array(test_writer))
             # Save the model
             if iteration % FLAGS.checkpoint_freq == 0 or iteration == FLAGS.max_steps - 1:
-                file_name = FLAGS.checkpoint_dir + '/HRED_model.ckpt'
-                saver.save(sess, file_name)
+                file_name = FLAGS.checkpoint_dir + '/HRED_model'
+                saver.save(sess, file_name, iteration)
                 
 def feature_extraction():
     """
     This method is used to retrieve the likelohood of different query pairs, given a session.
     """
-    raise NotImplemented
     # Load data
     ADJ = adj.ADJ()
     start_time = datetime.now()
@@ -149,7 +159,7 @@ def feature_extraction():
     saver = tf.train.Saver()
     
     with tf.Session() as sess:        
-        saver.restore(sess, FLAGS.checkpoint_dir + '/HRED_model.ckpt')
+        saver.restore(sess, tf.train.latest_checkpoint(FLAGS.checkpoint_dir))
         print('Model was restored.')
         features = {}
         queries = 0
@@ -282,6 +292,8 @@ if __name__ == '__main__':
                         help='Frequency with which the model state is saved.')
     parser.add_argument('--is_train', type = str, default = True,
                       help='Training or feature extraction')
+    parser.add_argument('--resume', type = str, default = False,
+                      help='Resume training from latest checkpoint')
     parser.add_argument('--log_dir', type = str, default = LOG_DIR_DEFAULT,
                         help='Summaries log directory')
     parser.add_argument('--checkpoint_dir', type = str, default = CHECKPOINT_DIR_DEFAULT,
