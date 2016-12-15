@@ -44,7 +44,7 @@ def train():
     # Choose a random subset to validate on, because otherwise the validation takes too long
     val_sess = np.random.choice(val_sess, 10)
     # Create model
-    model = HRED(FLAGS.vocab_dim, FLAGS.q_dim, FLAGS.s_dim, FLAGS.num_layers)
+    model = HRED(FLAGS.vocab_dim, FLAGS.q_dim, FLAGS.s_dim, 300, FLAGS.num_layers)
     print('[Model was created.]')
     # Feeds for inputs.
     with tf.variable_scope('input'):
@@ -107,6 +107,7 @@ def train():
                         losses.append(l)
                     val_losses.append(np.mean(losses))
                 test_writer.append(np.mean(val_losses))
+                print('-' * 40)
                 print('Train loss at step %s: %f.' % (iteration, train_writer[-1]))
                 print('Test loss at step %s: %f.' % (iteration, test_writer[-1]))
                 print('Number of examples seen: %s' % num_examples_seen)
@@ -143,9 +144,6 @@ def feature_extraction():
     # Data pipeline
     logits, S = model.inference(query, dec_input, s0)
     with tf.variable_scope('prediction'):
-        W = tf.get_default_graph().get_tensor_by_name('loss/weights:0')
-        b = tf.get_default_graph().get_tensor_by_name('loss/bias:0')
-        logits = tf.matmul(W, logits) + b
         preds = tf.nn.softmax(logits)
     # Create a saver.
     saver = tf.train.Saver()
