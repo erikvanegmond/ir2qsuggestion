@@ -83,7 +83,7 @@ class HRED(object):
             H0 = tf.get_variable('weights', (self.s_dim, self.q_dim), initializer=self.init, regularizer=self.reg)
             b0 = tf.get_variable('bias', (1,self.q_dim), initializer=tf.constant_initializer(0.0))
             # According to the paper, this is how s is used to generate the query
-            init_state = tf.matmul(S, H0) + b0
+            init_state = tf.tanh(tf.matmul(S, H0) + b0)
             word_embeddings = tf.nn.embedding_lookup(E, target)
             word_embeddings = word_embeddings = tf.split(0, word_embeddings.get_shape()[0].value, word_embeddings)#unpack_sequence(word_embeddings)
             # query words is a length T list of outputs (one for each input), or a nested tuple of such elements.

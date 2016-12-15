@@ -6,10 +6,11 @@ import argparse
 
 import tensorflow as tf
 import numpy as np
-import pickle as pkl
 from datetime import datetime
+import pickle
 
 from RNNTensors.jaimy_model import HRED
+import features.adj as adj
 from sessionizer import Sessionizer
 import utils
 
@@ -17,9 +18,8 @@ import utils
 # With these parameters you should get similar results as in the Numpy exercise.
 ### --- BEGIN default constants ---
 LEARNING_RATE_DEFAULT = 2e-3
-BATCH_SIZE_DEFAULT = 200
 MAX_STEPS_DEFAULT = 1500
-EVAL_FREQ_DEFAULT = 10
+EVAL_FREQ_DEFAULT = 100
 CHECKPOINT_FREQ_DEFAULT = 5000
 PRINT_FREQ_DEFAULT = 10
 Q_DIM_DEFAULT = 1000
@@ -32,38 +32,17 @@ LOG_DIR_DEFAULT = '../logs'
 CHECKPOINT_DIR_DEFAULT = '../checkpoints'
 ### --- END default constants---
 
-# We use a number of buckets and pad to the closest one for efficiency.
-_buckets = [(5, 10), (10, 15), (25, 30), (100, 100)]
-            
-def train_step(losses, params, learning_rate, max_gradient_norm, global_step):
-    gradient_norms = []
-    updates = []
-    opt = tf.train.GradientDescentOptimizer(learning_rate)
-    for b in xrange(len(_buckets)):
-        gradients = tf.gradients(losses[b], params)
-        clipped_gradients, norm = tf.clip_by_global_norm(gradients, max_gradient_norm)
-        gradient_norms.append(norm)
-        updates.append(opt.apply_gradients(zip(clipped_gradients, params), global_step=global_step))
-        
-def make_example(sequence, labels):
-    # The object we return
-    ex = tf.train.SequenceExample()
-    # A non-sequential feature of our example
-    sequence_length = len(sequence)
-    ex.context.feature["length"].int64_list.value.append(sequence_length)
-    # Feature lists for the two sequential features of our example
-    fl_tokens = ex.feature_lists.feature_list["tokens"]
-    fl_labels = ex.feature_lists.feature_list["labels"]
-    for token, label in zip(sequence, labels):
-        fl_tokens.feature.add().int64_list.value.append(token)
-        fl_labels.feature.add().int64_list.value.append(label)
-    return ex
-
 def train():
+    # Set the random seeds for reproducibility. DO NOT CHANGE.
+    tf.set_random_seed(42)
+    np.random.seed(42)
+    
     snizer = Sessionizer()
     train_sess = snizer.get_sessions_with_numbers()
     snizer = Sessionizer('../data/val_session')
     val_sess = snizer.get_sessions_with_numbers()
+    # Choose a random subset to validate on, because otherwise the validation takes too long
+    val_sess = np.random.choice(val_sess, 10)
     # Create model
     model = HRED(FLAGS.vocab_dim, FLAGS.q_dim, FLAGS.s_dim, FLAGS.num_layers)
     print('[Model was created.]')
@@ -110,6 +89,8 @@ def train():
                 num_examples_seen += 1
             # Append the loss of this session to the training data
             train_writer.append(np.mean(losses))
+            if iteration % FLAGS.print_freq == 0:
+                print('Visited %s examples of %s sessions. Loss: %f' % (num_examples_seen, iteration+1, train_writer[-1]))
             # Evaluate the model
             if iteration % FLAGS.eval_freq == 0 or iteration == FLAGS.max_steps - 1:
                 val_losses = []
@@ -131,12 +112,94 @@ def train():
                 print('Number of examples seen: %s' % num_examples_seen)
                 print('-' * 40)
                 # Save the loss data so that we can plot it later
-                np.save(open(FLAGS.log_dir + '/train.pnz', 'w'), np.array(train_writer))
-                np.save(open(FLAGS.log_dir + '/test.pnz', 'w'), np.array(test_writer))
+                np.save(FLAGS.log_dir + '/train', np.array(train_writer))
+                np.save(FLAGS.log_dir + '/test', np.array(test_writer))
             # Save the model
             if iteration % FLAGS.checkpoint_freq == 0 or iteration == FLAGS.max_steps - 1:
                 file_name = FLAGS.checkpoint_dir + '/HRED_model.ckpt'
                 saver.save(sess, file_name)
+                
+def feature_extraction():
+    """
+    This method is used to retrieve the likelohood of different query pairs, given a session.
+    """
+    raise NotImplemented
+    # Load data
+    ADJ = adj.ADJ()
+    start_time = datetime.now()
+    time = start_time.strftime('%d-%m %H:%M:%S')
+    print("[%s: Loading sessions lm_tr_sessions.pkl]" % time)
+    pkl_file = open('../data/lm_tr_sessions.pkl', 'rb')
+    sessions = pickle.load(pkl_file)
+    pkl_file.close()
+    print("[Loaded %s test sessions. It took %f seconds.]" % (len(sessions), (datetime.now() - start_time).seconds))
+    # Create model
+    model = HRED(FLAGS.vocab_dim, FLAGS.q_dim, FLAGS.s_dim, FLAGS.num_layers)
+    # Feeds for inputs.
+    with tf.variable_scope('input'):
+        query = tf.placeholder(tf.int32, [FLAGS.padding,])
+        dec_input = tf.placeholder(tf.int32, [FLAGS.padding,])
+        s0 = tf.placeholder(tf.float32, [1, FLAGS.s_dim])
+    # Data pipeline
+    logits, S = model.inference(query, dec_input, s0)
+    with tf.variable_scope('prediction'):
+        W = tf.get_default_graph().get_tensor_by_name('loss/weights:0')
+        b = tf.get_default_graph().get_tensor_by_name('loss/bias:0')
+        logits = tf.matmul(W, logits) + b
+        preds = tf.nn.softmax(logits)
+    # Create a saver.
+    saver = tf.train.Saver()
+    
+    with tf.Session() as sess:        
+        saver.restore(sess, FLAGS.checkpoint_dir + '/HRED_model.ckpt')
+        print('Model was restored.')
+        features = {}
+        queries = 0
+        
+        start_time = datetime.now()
+        time = start_time.strftime('%d-%m %H:%M:%S')
+        print("[%s: Creating features...]" % time)
+        for session in sessions:
+            # Encode the session
+            state = np.zeros((1,FLAGS.s_dim))
+            for i in range(len(session)-2):
+                # Go through the session step by step to get the session encoding up until the ancor query
+                num_query = utils.vectorify(session[i])
+                x1 = pad_query(num_query, pad_size=FLAGS.padding)
+                num_query = utils.vectorify(session[i+1])
+                x2 = pad_query(num_query, pad_size=FLAGS.padding, q_type='dec_input')   
+                state, l = sess.run([S], feed_dict={query: x1, dec_input: x2, s0: state})            
+            # Get the anchor query
+            anchor_query = session[-2]
+            adj_dict = ADJ.adj_function(anchor_query)
+            highest_adj_queries = adj_dict['adj_queries']
+            features[anchor_query] = {}
+            # Calculate the likelihood between the queries
+            for sug_query in highest_adj_queries:
+                num_anchor_query = utils.vectorify(anchor_query)
+                x1 = pad_query(num_anchor_query, pad_size=FLAGS.padding)
+                num_sug_query = utils.vectorify(sug_query)
+                x2 = pad_query(num_sug_query, pad_size=FLAGS.padding, q_type='dec_input')
+                y = pad_query(num_sug_query, pad_size=FLAGS.padding, q_type='target')
+                # Get the likelihood from the model
+                like = sess.run([preds], feed_dict={query: x1, dec_input: x2, s0: state})   
+                features[anchor_query][sug_query] = likelihood(like, y)
+            queries += 1
+            if queries % 10000 == 0:
+                print("[Visited %s anchor queries.]" % (queries))
+        print("[Saving features %s features.]" % (len(features)))
+        pickle.dump(features, open('../data/HRED_features.tf.pkl', 'wb'))
+        print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
+        
+def likelihood(preds, target_query):
+    # Calculate the query likelihood without taking the padding into account
+    L = 1
+    for word in target_query:
+        if word == utils.PAD_ID:
+            break
+        else:
+            L *= preds[word]
+    return L
     
 def pad_query(query, pad_size=50, q_type='input'):
     """
@@ -186,9 +249,15 @@ def main(_):
     # Make directories if they do not exists yet
     if not tf.gfile.Exists(FLAGS.log_dir):
       tf.gfile.MakeDirs(FLAGS.log_dir)
+    if not tf.gfile.Exists(FLAGS.checkpoint_dir):
+      tf.gfile.MakeDirs(FLAGS.checkpoint_dir)
     
+    if FLAGS.is_train == 'False':
+    # Run feature extraction
+        raise NotImplemented
+    else:
     # Run the training operation
-    train()
+        train()
 
 if __name__ == '__main__':
     # Command line arguments
@@ -207,14 +276,14 @@ if __name__ == '__main__':
                         help='Number of steps to run trainer.')
     parser.add_argument('--padding', type = int, default = PADDING_DEFAULT,
                         help='To what length the queries will be padded.')
-    parser.add_argument('--batch_size', type = int, default = BATCH_SIZE_DEFAULT,
-                        help='Batch size to run trainer.')
     parser.add_argument('--print_freq', type = int, default = PRINT_FREQ_DEFAULT,
                         help='Frequency of evaluation on the train set')
     parser.add_argument('--eval_freq', type = int, default = EVAL_FREQ_DEFAULT,
                         help='Frequency of evaluation on the test set')
     parser.add_argument('--checkpoint_freq', type = int, default = CHECKPOINT_FREQ_DEFAULT,
                         help='Frequency with which the model state is saved.')
+    parser.add_argument('--is_train', type = str, default = True,
+                      help='Training or feature extraction')
     parser.add_argument('--log_dir', type = str, default = LOG_DIR_DEFAULT,
                         help='Summaries log directory')
     parser.add_argument('--checkpoint_dir', type = str, default = CHECKPOINT_DIR_DEFAULT,
