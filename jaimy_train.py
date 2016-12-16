@@ -33,9 +33,9 @@ CHECKPOINT_DIR_DEFAULT = '../checkpoints'
 ### --- END default constants---
 
 def train():
-    # Set the random seeds for reproducibility. DO NOT CHANGE.
-    tf.set_random_seed(42)
-    np.random.seed(42)
+    # Set the random seeds for reproducibility.
+    #tf.set_random_seed(42)
+    #np.random.seed(42)
     
     snizer = Sessionizer()
     train_sess = snizer.get_sessions_with_numbers()
@@ -130,6 +130,7 @@ def train():
             if iteration % FLAGS.checkpoint_freq == 0 or iteration == FLAGS.max_steps - 1:
                 file_name = FLAGS.checkpoint_dir + '/HRED_model'
                 saver.save(sess, file_name, iteration)
+    writer.close()
                 
 def feature_extraction():
     """
