@@ -9,7 +9,7 @@ import numpy as np
 from datetime import datetime
 import pickle
 
-from RNNTensors.jaimy_model import HRED
+from RNNTensors.TFmodel import HRED
 import features.adj as adj
 from sessionizer import Sessionizer
 import utils
@@ -34,9 +34,9 @@ CHECKPOINT_DIR_DEFAULT = '../checkpoints'
 ### --- END default constants---
 
 def train():
-    # Set the random seeds for reproducibility. DO NOT CHANGE.
-    tf.set_random_seed(42)
-    np.random.seed(42)
+    # Set the random seeds for reproducibility.
+    #tf.set_random_seed(42)
+    #np.random.seed(42)
     
     snizer = Sessionizer()
     train_sess = snizer.get_sessions_with_numbers()
@@ -132,7 +132,6 @@ def train():
                 print('Test loss at step %s: %f. Accuracy: %f' % (iteration, test_writer[-1], accuracy))
                 print('Number of examples seen: %s' % num_examples_seen)
                 print('-' * 40)
-                break
                 # Save the loss data so that we can plot it later
                 np.save(FLAGS.log_dir + '/train', np.array(train_writer))
                 np.save(FLAGS.log_dir + '/test', np.array(test_writer))
@@ -140,6 +139,7 @@ def train():
             if iteration % FLAGS.checkpoint_freq == 0 or iteration == FLAGS.max_steps - 1:
                 file_name = FLAGS.checkpoint_dir + '/HRED_model'
                 saver.save(sess, file_name, iteration)
+    writer.close()
                 
 def feature_extraction():
     """

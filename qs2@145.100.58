@@ -36,7 +36,7 @@ class HRED(object):
     self.is_training = is_training
     self.click_level = click_level
     
-    self.init = initializers.xavier_initializer()
+    self.init = tf.random_normal_initializer(stddev=1e-3)
     self.reg = regularizers.l2_regularizer(1e-2)
     self.counter = 0
 
@@ -125,14 +125,14 @@ class HRED(object):
         inpts = tf.cast(logits, tf.float32)
         softmax_loss = tf.nn.softmax_cross_entropy_with_logits(inpts, lbls)
         softmax_loss = tf.reduce_mean(softmax_loss)
-        tf.summary.scalar('softmax loss', softmax_loss)
+        tf.summary.scalar('softmax_loss', softmax_loss)
         
         reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
         reg_loss = tf.reduce_sum(reg_losses)
-        tf.summary.scalar('regularization loss', reg_loss)
+        tf.summary.scalar('regularization_loss', reg_loss)
         
         loss = tf.add(softmax_loss, reg_loss)
-        tf.summary.scalar('total loss', loss)
+        tf.summary.scalar('total_loss', loss)
     ########################
     # END OF YOUR CODE    #
     #######################
