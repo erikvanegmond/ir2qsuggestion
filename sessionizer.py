@@ -11,7 +11,6 @@ class Sessionizer(object):
         self.sessions = []
         self.number_sessions = []
         self.more_data = []
-        self
 
     def find_all_sessions(self):
         print("locating sessions " + self.data_path)
