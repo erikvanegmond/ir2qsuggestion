@@ -118,12 +118,15 @@ class HRED(object):
     # PUT YOUR CODE HERE  #
     #######################
     with tf.variable_scope('loss'):
-        lbls = tf.one_hot(labels, self.vocab_size, axis=-1)
-        inpts = tf.cast(logits, tf.float32)
+        # Calculate the length of the query (e.g. the part that is not equal to the padding)
+        query_len = tf.reduce_sum(tf.cast(tf.not_equal(labels, utils.PAD_ID), tf.int32))
+        # Select only the parts that correspond to the actual query
+        lbls = tf.one_hot(labels[:query_len], self.vocab_size, axis=-1)
+        inpts = tf.cast(logits[:query_len], tf.float32)
         softmax_loss = tf.nn.softmax_cross_entropy_with_logits(inpts, lbls)
         softmax_loss = tf.reduce_mean(softmax_loss)
         tf.summary.scalar('softmax_loss', softmax_loss)
-        
+        # Add the weight regularization loss
         reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
         reg_loss = tf.reduce_sum(reg_losses)
         tf.summary.scalar('regularization_loss', reg_loss)
@@ -158,10 +161,14 @@ class HRED(object):
     # PUT YOUR CODE HERE  #
     ########################
     with tf.name_scope('accuracy'):
+    # Create the predictions by applying softmax to the logits
       preds = tf.nn.softmax(logits)
+      # Count how many predictions are correct
       correct_prediction = tf.cast(tf.equal(tf.cast(tf.argmax(preds,1), tf.int32), labels), tf.float32)
+      # Calculate the length of the actual query (e.g. the number of words that are not equal to padding)
       query_len = tf.reduce_sum(tf.cast(tf.not_equal(labels, utils.PAD_ID), tf.int32))
-      accuracy = tf.reduce_mean(correct_prediction[:query_len])/tf.cast(query_len, tf.float32)
+      # Calculate the accuracy over the actual query
+      accuracy = tf.reduce_sum(correct_prediction[:query_len])/tf.cast(query_len, tf.float32)
       tf.summary.scalar('accuracy', accuracy)
     ########################
     # END OF YOUR CODE    #
