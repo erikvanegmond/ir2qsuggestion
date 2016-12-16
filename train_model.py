@@ -54,7 +54,7 @@ def train():
         dec_input = tf.placeholder(tf.int32, [FLAGS.padding,])
         target = tf.placeholder(tf.int32, [FLAGS.padding,])
         s0 = tf.placeholder(tf.float32, [1, FLAGS.s_dim])
-        click_hot = tf.placeholder(tf.int32, shape=(1,FLAGS.click_level))
+        click_hot = tf.placeholder(tf.float32, shape=(1,FLAGS.click_level))
         #click_rank = tf.placeholder(tf.int32, shape=(1, 1))#tf.placeholder(tf.int32, shape=(), name="init")#tf.placeholder(tf.int32, shape=(1, FLAGS.click_level))
     print (click_hot)
     # Data pipeline
@@ -99,11 +99,14 @@ def train():
                 y = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='target')
                 z = np.zeros([FLAGS.click_level])
                 z[click_ranks[i]] = 1
+                z = np.reshape(z, (1, 5))
                 if i == len(session)-2:
                     # We're at the anchor query of this session
+                    print("anchor")
                     _, l, summary = sess.run([opt_operation, loss, merged], feed_dict={query: x1, dec_input: x2, target: y, s0: state, click_hot: z})
                     writer.add_summary(summary, iteration)
                 else:
+                    print("otherwise")
                     _, state, l = sess.run([opt_operation, S, loss], feed_dict={query: x1, dec_input: x2, target: y, s0: state, click_hot: z})
                 losses.append(l)
                 num_examples_seen += 1
@@ -122,7 +125,7 @@ def train():
                         x1 = pad_query(session[i], pad_size=FLAGS.padding)
                         x2 = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='dec_input')
                         y = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='target')
-                    
+                        print("val")
                         state, l, accuracy = sess.run([S, loss, acc], feed_dict={query: x1, dec_input: x2, target: y, s0: state, click_hot: z})
                         losses.append(l)
                     val_losses.append(np.mean(losses))
