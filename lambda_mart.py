@@ -119,7 +119,7 @@ def lambdaMart(data, data_val, data_test, experiment_string):
     rankings = [np.arange(20) for _ in range(test_indices)]
 
     indexes_ones = [q % 20 for q, [x] in enumerate(data_test[:, :1]) if x == 1.0]
-    mean_rank = np.mean([1/(r[i]+1.0) for i, r in izip(indexes_ones, rankings)])
+    mean_rank = mmr(indexes_ones, rankings)
 
     text_file = open("Results" + experiment_string + ".txt", "w")
 
@@ -132,7 +132,7 @@ def lambdaMart(data, data_val, data_test, experiment_string):
     scores = model.predict(test_queries)
     # print scores
     rankings, scores = model.predict_rankings(test_queries, return_scores=True)
-    mean_rank = np.mean([1 / (r[i] + 1.0) for i, r in izip(indexes_ones, rankings)])
+    mean_rank = mmr(indexes_ones, rankings)
 
     text_file.write("LambarMART MRR: %s" % mean_rank)
 
@@ -142,6 +142,10 @@ def lambdaMart(data, data_val, data_test, experiment_string):
     model.save('../models/LambdaMART_' + experiment_string + model.metric)
     print("Done with experiment" + experiment_string)
     text_file.close()
+
+def mmr(indexes, ranks):
+    return np.mean([1 / (r[i] + 1.0) for i, r in izip(indexes, ranks)])
+
 
 
 def create_features(anchor_query, session):
@@ -253,7 +257,7 @@ def make_long_tail_set(sessions, experiment_string):
         # until we have a query that appears in the Background data
         for j in range(len(anchor_query.split())):
             [background_count] = bgc.calculate_feature(None, [anchor_query])
-            
+
             if background_count == 0 and len(anchor_query.split()) > 1:
                 print("shortened")
                 anchor_query = shorten_query(anchor_query)

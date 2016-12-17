@@ -16,13 +16,16 @@ class Ranker(object):
 
     def __init__(self, train_sessions_file="../data/tr_session", bg_sessions_file="../data/bg_session", vocab_file="../data/aol_vocab.dict.pkl"):
         if not len(Ranker.sessions):
-            Ranker.sessionizer = Sessionizer(data_path=train_sessions_file)
-            Ranker.sessions = Ranker.sessionizer.get_sessions()
-            Ranker.bg_sessionizer = Sessionizer(data_path=bg_sessions_file)
-            Ranker.bg_sessions = Ranker.bg_sessionizer.get_sessions()
-            Ranker.query_counts = Counter(list(itertools.chain.from_iterable(Ranker.bg_sessions)))
+            if len(train_sessions_file):
+                Ranker.sessionizer = Sessionizer(data_path=train_sessions_file)
+                Ranker.sessions = Ranker.sessionizer.get_sessions()
+                print "sessions loaded", len(Ranker.sessions)
+            if len(bg_sessions_file):
+                Ranker.bg_sessionizer = Sessionizer(data_path=bg_sessions_file)
+                Ranker.bg_sessions = Ranker.bg_sessionizer.get_sessions()
+                Ranker.query_counts = Counter(list(itertools.chain.from_iterable(Ranker.bg_sessions)))
         else:
-            print "don't have to get the sessions as we already have them"
+            print("don't have to get the sessions as we already have them")
 
         if not Ranker.w2n:
             pkl_file = open(vocab_file, 'rb')
