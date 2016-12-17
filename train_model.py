@@ -69,7 +69,7 @@ def train():
         train_writer = []#tf.summary.FileWriter(FLAGS.log_dir + '/train', sess.graph)
         test_writer = []#tf.summary.FileWriter(FLAGS.log_dir + '/test')
         # Initialize variables
-        if FLAGS.resume:
+        if FLAGS.resume == 'True':
             saver.restore(sess, tf.train.latest_checkpoint(FLAGS.checkpoint_dir))
         else:
             sess.run(tf.global_variables_initializer())     
@@ -104,6 +104,7 @@ def train():
             # Evaluate the model
             if iteration % FLAGS.eval_freq == 0 or iteration == FLAGS.max_steps - 1:
                 val_losses = []
+                accs = []
                 # Loop over all the sessions in the validation set
                 for session in val_sess:
                     state = np.zeros((1,FLAGS.s_dim))
@@ -112,14 +113,18 @@ def train():
                         x1 = pad_query(session[i], pad_size=FLAGS.padding)
                         x2 = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='dec_input')
                         y = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='target')
-                    
-                        state, l, accuracy = sess.run([S, loss, acc], feed_dict={query: x1, dec_input: x2, target: y, s0: state})
+                        
+                        if i < len(session)-2:
+                            state, l = sess.run([S, loss], feed_dict={query: x1, dec_input: x2, target: y, s0: state})
+                        else:
+                            state, l, accuracy = sess.run([S, loss, acc], feed_dict={query: x1, dec_input: x2, target: y, s0: state})
+                            accs.append(accuracy)
                         losses.append(l)
                     val_losses.append(np.mean(losses))
                 test_writer.append(np.mean(val_losses))
                 print('-' * 40)
                 print('Train loss at step %s: %f.' % (iteration, train_writer[-1]))
-                print('Test loss at step %s: %f. Accuracy: %f' % (iteration, test_writer[-1], accuracy))
+                print('Test loss at step %s: %f. Accuracy: %f' % (iteration, test_writer[-1], np.mean(accs)))
                 print('Number of examples seen: %s' % num_examples_seen)
                 print('-' * 40)
                 # Save the loss data so that we can plot it later
