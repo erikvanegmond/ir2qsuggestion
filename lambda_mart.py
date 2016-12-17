@@ -14,23 +14,23 @@ from rankpy.queries import Queries
 hred_use = True
 training = True
 
-# import features.adj as ad
-# import features.cossimilar as cs
-# import features.length as lg
-# import features.lengthdiff as ld
-# import features.levenstein as levs
-# if hred_use == True:
-#     import features.HRED as hredf
-# import features.bg_count as bgcount
-#
-# adj = ad.ADJ()
-# lev = levs.Levenshtein()
-# lendif = ld.LengthDiff()
-# leng = lg.Length()
-# coss = cs.CosineSimilarity()
-# if hred_use == True:
-#     hred = hredf.HRED()
-# bgc = bgcount.BgCount()
+import features.adj as ad
+import features.cossimilar as cs
+import features.length as lg
+import features.lengthdiff as ld
+import features.levenstein as levs
+if hred_use == True:
+    import features.HRED as hredf
+import features.bg_count as bgcount
+
+adj = ad.ADJ()
+lev = levs.Levenshtein()
+lendif = ld.LengthDiff()
+leng = lg.Length()
+coss = cs.CosineSimilarity()
+if hred_use == True:
+    hred = hredf.HRED()
+bgc = bgcount.BgCount()
 
 
 def get_query_index_pointers(dataset):
@@ -80,7 +80,6 @@ def lambdaMart(data, data_val, data_test, experiment_string):
     training_targets = pd.DataFrame(data[:10000, :1]).astype(np.float32)
     print(training_targets.shape)
     training_features = pd.DataFrame(data[:10000, 1:]).astype(np.float32)
-    print(training_features.shape)
     training_queries = Queries(training_features, training_targets, query_index_pointers)
 
     validation_targets = pd.DataFrame(data_val[:, :1]).astype(np.float32)
@@ -116,7 +115,7 @@ def lambdaMart(data, data_val, data_test, experiment_string):
 
     test_set_length = data_test.shape[0]
     logging.info('ADJ score')
-    test_indices = test_set_length/20.0
+    test_indices = test_set_length/20
     rankings = [np.arange(20) for _ in range(test_indices)]
 
     indexes_ones = [q % 20 for q, [x] in enumerate(data_test[:, :1]) if x == 1.0]
@@ -219,7 +218,7 @@ def next_query_prediction(sessions, experiment_string):
         adj_dict = adj.adj_function(anchor_query)
         highest_adj_queries = adj_dict['adj_queries']
         features, highest_adj_queries = create_features(anchor_query, session)
-        target_vector = -1 * np.ones(len(highest_adj_queries))
+        target_vector = np.zeros(len(highest_adj_queries))
         [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
         target_vector[target_query_index] = 1
         # then add the session to the train, val, test data
@@ -232,7 +231,6 @@ def next_query_prediction(sessions, experiment_string):
             used_sess += 1
         if used_sess % 1000 == 0:
             print("[Visited %s anchor queries.]" % used_sess)
-            break
     lambda_dataframe = pd.DataFrame(data=np.transpose(lambdamart_data), columns=headers)
     lambda_dataframe.to_csv('../data/lamdamart_data_' + experiment_string + '.csv')
     print("---" * 30)
@@ -263,7 +261,7 @@ def make_long_tail_set(sessions, experiment_string):
                 break
         features, highest_adj_queries = create_features(anchor_query, session)
         # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
-        target_vector = -1 * np.ones(len(highest_adj_queries))
+        target_vector = np.zeros(len(highest_adj_queries))
         [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
         target_vector[target_query_index] = 1
         # then add the session to the train, val, test data
