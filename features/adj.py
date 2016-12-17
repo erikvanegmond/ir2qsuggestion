@@ -5,13 +5,14 @@ import pickle as pkl
 from datetime import datetime
 import numpy as np
 
+
 class ADJ(Ranker):
     suitable_sessions = []
     bg_info = defaultdict(Counter)
 
-    def __init__(self):
-        super(ADJ, self).__init__()
-        if not ADJ.bg_info:
+    def __init__(self, load_bg=True, **kwargs):
+        super(ADJ, self).__init__(**kwargs)
+        if load_bg and not ADJ.bg_info:
             info_path = '../data/bg_info.pkl'
             if os.path.isfile(info_path):
                 time = datetime.now().strftime('%d-%m %H:%M:%S')
@@ -62,7 +63,7 @@ class ADJ(Ranker):
 
     @staticmethod
     def find_suitable_sessions(suitable_sessions_fname):
-        #suitable_sessions_fname = "../data/lm_train_sessions.pkl"
+        # suitable_sessions_fname = "../data/lm_train_sessions.pkl"
         if os.path.isfile(suitable_sessions_fname):
             time = datetime.now().strftime('%d-%m %H:%M:%S')
             print("[%s: Loading sessions...]" % time)
