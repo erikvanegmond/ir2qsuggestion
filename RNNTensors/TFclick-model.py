@@ -37,8 +37,9 @@ class HRED(object):
     
     self.init = tf.random_normal_initializer(stddev=1e-3)
     self.reg = regularizers.l2_regularizer(1e-2)
+    self.counter = 0
 
-  def inference(self, query, target, sess_enc):
+  def inference(self, query, target, sess_enc, click_hot):
     """
     Given a session x, this method will encode each query in x. After that it
     will encode the session given the query states. Eventually a new query will
@@ -63,6 +64,7 @@ class HRED(object):
             word_embeddings = tf.nn.embedding_lookup(E, query)
             word_embeddings = tf.split(0, word_embeddings.get_shape()[0].value, word_embeddings)#unpack_sequence(word_embeddings)
             _, Q = tf.nn.rnn(cell, word_embeddings, dtype=tf.float32)
+            Q = tf.concat(1, [Q, click_hot])
         with tf.variable_scope('SessionEncoder'):
             # Create the GRU cell(s)
             single_cell = tf.nn.rnn_cell.GRUCell(self.s_dim)
