@@ -36,10 +36,15 @@ bgc = bgcount.BgCount()
 def get_query_index_pointers(dataset):
     query_index_pointers = []
     lower_bound = 0
+    print("in get qip: " + str(dataset.shape[0]))
     for i in range(dataset.shape[0] / 20 + 1):
         query_index_pointer = lower_bound
         query_index_pointers.append(query_index_pointer)
         lower_bound += 20
+        if i == dataset.shape[0] / 20:
+            print(dataset.shape[0] / 20)
+            print(i)
+            print(lower_bound)
     query_index_pointers = np.array(query_index_pointers)
     return query_index_pointers
 
@@ -52,9 +57,9 @@ def lambdaMart(data, data_val, data_test, experiment_string):
 #     55% train
 #     20% validation
 #     25% test
-    query_index_pointers = get_query_index_pointers(data[:10000, 0])
-    print(query_index_pointers.shape)
+    query_index_pointers = get_query_index_pointers(data[:, 0])
     query_index_pointers_val = get_query_index_pointers(data_val[:, 0])
+    print(query_index_pointers)
     query_index_pointers_test = get_query_index_pointers(data_test[:, 0])
 
 #    train_part_pointer = int(math.floor(query_index_pointers.shape[0] * 0.55))
@@ -67,7 +72,7 @@ def lambdaMart(data, data_val, data_test, experiment_string):
 #    validation_length = validation_pointers.shape[0]
 #    upper_bound_val = validation_pointers[validation_length - 1]
 #    test_pointers = test_val_pointers[val_part - 1:]
-#
+#cd
 #    training_queries = data[:upper_bound_train, :]
 #
 #    validation_queries, test_queries = data[upper_bound_train:upper_bound_val, :], data[upper_bound_val:, :]
@@ -77,13 +82,16 @@ def lambdaMart(data, data_val, data_test, experiment_string):
 #     Set them to queries
     logging.info('Creating Training queries')
 
-    training_targets = pd.DataFrame(data[:10000, :1]).astype(np.float32)
+    training_targets = pd.DataFrame(data[:, :1]).astype(np.float32)
     print(training_targets.shape)
-    training_features = pd.DataFrame(data[:10000, 1:]).astype(np.float32)
+    training_features = pd.DataFrame(data[:, 1:]).astype(np.float32)
+    print(training_features.shape)
     training_queries = Queries(training_features, training_targets, query_index_pointers)
 
     validation_targets = pd.DataFrame(data_val[:, :1]).astype(np.float32)
+    print(validation_targets.shape)
     validation_features = pd.DataFrame(data_val[:, 1:]).astype(np.float32)
+    print(validation_features.shape)
     validation_queries = Queries(validation_features, validation_targets, query_index_pointers_val)
 
     test_targets = pd.DataFrame(data_test[:, :1]).astype(np.float32)
@@ -134,7 +142,8 @@ def lambdaMart(data, data_val, data_test, experiment_string):
     rankings, scores = model.predict_rankings(test_queries, return_scores=True)
     mean_rank = mmr(indexes_ones, rankings)
 
-    text_file.write("LambarMART MRR: %s" % mean_rank)
+    text_file.write("LambdaMART MRR: %s" % mean_rank)
+    text_file.write("nDCG@20 on lambdaMART: %s" % model.evaluate(test_queries, n_jobs=-1))
 
     logging.info('MRR: %s' % mean_rank)
 
@@ -264,9 +273,15 @@ def make_long_tail_set(sessions, experiment_string):
             else:
                 break
         features, highest_adj_queries = create_features(anchor_query, session)
+        if len(highest_adj_queries) < 20:
+            continue
         # target Query is the positive candidate if it is in the 20 queries, the other 19 are negative candidates
         target_vector = np.zeros(len(highest_adj_queries))
-        [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
+        index_list = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
+        if index_list == []:
+            continue
+        else:
+            [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
         target_vector[target_query_index] = 1
         # then add the session to the train, val, test data
         sess_data = np.vstack((np.transpose(target_vector), features))
