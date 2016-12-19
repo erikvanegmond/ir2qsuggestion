@@ -1,12 +1,12 @@
 import cPickle as pickle
-from model.model import Model
+#from model.model import Model
 from features.feature import Feature
 import utils
 
 
 class DatasetFeature(Feature):
     features = {}
-    model = None
+#    model = None
     unsaved_changes = False
 
     def __init__(self, data_file="../data/HRED_features.pkl", model_file='../models/29-11_4.589_0_90005x1000x90005.npz'):
@@ -15,10 +15,10 @@ class DatasetFeature(Feature):
         else:
             print "Features already loaded."
             
-        if not DatasetFeature.model:
-            DatasetFeature.model = Model.load(model_file)
-        else:
-            print "Model already loaded."
+#        if not DatasetFeature.model:
+#            DatasetFeature.model = Model.load(model_file)
+#        else:
+#            print "Model already loaded."
             
     def save(self, data_file="../data/HRED_features.pkl"):
         if DatasetFeature.unsaved_changes:
@@ -30,19 +30,14 @@ class HRED(DatasetFeature):
         fts = []
         for q in queries:
             if compared_query in DatasetFeature.features.keys():
-                if q in DatasetFeature.features[compared_query].keys():
+                try:
                     fts.append(DatasetFeature.features[compared_query][q])
-                else:
+                except:
                     print('Unknown suggestion: ' + q)
-                    likelihood = HRED.add_likelihood(compared_query, q)
-                    DatasetFeature.features[compared_query][q] = likelihood
-                    fts.append(DatasetFeature.features[compared_query][q])
+                    raise                    
             else:
                 print('Unknown anchor query: ' + compared_query)
-                DatasetFeature.features[compared_query] = {}
-                likelihood = HRED.add_likelihood(compared_query, q)
-                DatasetFeature.features[compared_query][q] = likelihood
-                fts.append(DatasetFeature.features[compared_query][q])
+                raise KeyError
                 
         HRED.cooccurrences[compared_query]['HRED'] = fts
         return fts

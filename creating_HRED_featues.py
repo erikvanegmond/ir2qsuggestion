@@ -41,7 +41,7 @@ def feature_extraction(sessions, long_tail=False):
     """
     feature_file = '../data/HRED_features.tf.pkl'
     # Create model
-    model = HRED(FLAGS.vocab_dim, FLAGS.q_dim, FLAGS.s_dim, FLAGS.num_layers)
+    model = HRED(FLAGS.vocab_dim, FLAGS.q_dim, FLAGS.s_dim, 300, FLAGS.num_layers)
     # Feeds for inputs.
     with tf.variable_scope('input'):
         query = tf.placeholder(tf.int32, [FLAGS.padding,])
