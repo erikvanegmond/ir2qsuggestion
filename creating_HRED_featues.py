@@ -32,7 +32,7 @@ VOCAB_DIM_DEFAULT = 90004
 NUM_LAYERS_DEFAULT = 1
 # Directory for tensorflow logs
 LOG_DIR_DEFAULT = '../logs'
-CHECKPOINT_DIR_DEFAULT = '../checkpoints'
+CHECKPOINT_DIR_DEFAULT = '../checkpoints/plain_model'
 ### --- END default constants---
                 
 def feature_extraction(sessions, long_tail=False):
