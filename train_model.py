@@ -27,8 +27,8 @@ NUM_LAYERS_DEFAULT = 1
 PADDING_DEFAULT = 50
 CLICK_LEVEL = 5
 # Directory for tensorflow logs
-LOG_DIR_DEFAULT = '../logs/SGD'
-CHECKPOINT_DIR_DEFAULT = '../checkpoints/SGD'
+LOG_DIR_DEFAULT = '../logs/sessionwise'
+CHECKPOINT_DIR_DEFAULT = '../checkpoints/sessionwise'
 ### --- END default constants---
 
 def train_step(loss, max_gradient_norm=1.0):
@@ -50,7 +50,7 @@ def train():
     snizer = Sessionizer('../data/val_session')
     val_sess = snizer.get_sessions_with_numbers()
     # Choose a random subset to validate on, because otherwise the validation takes too long
-    val_sess = np.random.choice(val_sess, 10)
+    val_sess = np.random.choice(val_sess, 50)
     # Create model
     model = HRED(FLAGS.vocab_dim, FLAGS.q_dim, FLAGS.s_dim, 300, FLAGS.num_layers)
     # Feeds for inputs.
@@ -84,14 +84,13 @@ def train():
             sess.run(tf.global_variables_initializer()) 
             print('[Initialized variables.]')
 #         Do a loop
-        start_time = datetime.now()
-        time = start_time.strftime('%d-%m %H:%M:%S')
+        time = datetime.now().strftime('%d-%m %H:%M:%S')
         print('[%s: Starting training.]' % time)
         num_examples_seen = 0
         best_loss = 0
-        for iteration in range(FLAGS.max_steps):
+        for iteration in range(len(train_sess)):#range(FLAGS.max_steps):
             # Select a random session to train on.
-            session = np.random.choice(train_sess)
+            session = train_sess[iteration]#np.random.choice(train_sess)
             state = np.zeros((1,FLAGS.s_dim))
             #losses = []
             for i in range(len(session)-1):
@@ -149,6 +148,57 @@ def train():
                     file_name = FLAGS.checkpoint_dir + '/HRED_model'
                     saver.save(sess, file_name, iteration)
     writer.close()
+    time = datetime.now().strftime('%d-%m %H:%M:%S')
+    print('[%s: Training finished.]' % time)
+    
+def test():
+    """
+    This method calculates the mean loss and accuracy of the model
+    """
+    snizer = Sessionizer('../data/test_session')
+    test_sess = snizer.get_sessions_with_numbers()
+    # Create model
+    model = HRED(FLAGS.vocab_dim, FLAGS.q_dim, FLAGS.s_dim, 300, FLAGS.num_layers)
+    # Feeds for inputs.
+    with tf.variable_scope('input'):
+        query = tf.placeholder(tf.int32, [FLAGS.padding,])
+        dec_input = tf.placeholder(tf.int32, [FLAGS.padding,])
+        target = tf.placeholder(tf.int32, [FLAGS.padding,])
+        s0 = tf.placeholder(tf.float32, [1, FLAGS.s_dim])
+    # Data pipeline
+    logits, S = model.inference(query, dec_input, s0)
+    loss = model.loss(logits, target)
+    acc = model.accuracy(logits, target)
+    # Create a saver.
+    saver = tf.train.Saver()
+    
+    with tf.Session() as sess:        
+        saver.restore(sess, tf.train.latest_checkpoint(FLAGS.checkpoint_dir))
+        print('Model was restored.')
+        
+        losses = []
+        accuracies = []
+        for j, session in enumerate(test_sess):
+            # Encode the session
+            state = np.zeros((1,FLAGS.s_dim))
+            for i in range(len(session)-1):
+                # Loop over the session and predict each query using the previous ones                
+                x1 = pad_query(session[i], pad_size=FLAGS.padding)
+                x2 = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='dec_input')
+                y = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='target')
+                
+                if i < len(session)-2:
+                    state = sess.run(S, feed_dict={query: x1, dec_input: x2, target: y, s0: state})
+                else:
+                    # We're at the anchor query of this session
+                    l, accuracy = sess.run([loss, acc], feed_dict={query: x1, dec_input: x2, target: y, s0: state})
+                    losses.append(l)
+                    accuracies.append(accuracy)
+            if (j+1)%FLAGS.print_freq == 0:
+                print('-' * 40)
+                print('After %s sessions:' % (j+1))
+                print('Mean loss: %f' % np.mean(losses))
+                print('Mean accuracy : %f' % np.mean(accuracies))            
     
 def pad_query(query, pad_size=50, q_type='input'):
     """
@@ -200,9 +250,13 @@ def main(_):
       tf.gfile.MakeDirs(FLAGS.log_dir)
     if not tf.gfile.Exists(FLAGS.checkpoint_dir):
       tf.gfile.MakeDirs(FLAGS.checkpoint_dir)
-      
-    # Run the training operation
-    train()
+    
+    if not FLAGS.is_train:# == 'False':
+        print('Going to test latest model in directory %s' % FLAGS.checkpoint_dir)
+        test()
+    else:
+        # Run the training operation
+        train()
 
 if __name__ == '__main__':
     # Command line arguments
@@ -227,7 +281,7 @@ if __name__ == '__main__':
                         help='Frequency of evaluation on the test set')
     parser.add_argument('--checkpoint_freq', type = int, default = CHECKPOINT_FREQ_DEFAULT,
                         help='Frequency with which the model state is saved.')
-    parser.add_argument('--is_train', type = str, default = True,
+    parser.add_argument('--is_train', type = str, default = False,
                       help='Training or feature extraction')
     parser.add_argument('--resume', type = str, default = False,
                       help='Resume training from latest checkpoint')
