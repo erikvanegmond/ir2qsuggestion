@@ -73,8 +73,7 @@ def train():
         else:
             sess.run(tf.global_variables_initializer())     
 #         Do a loop
-        start_time = datetime.now()
-        time = start_time.strftime('%d-%m %H:%M:%S')
+        time = datetime.now().strftime('%d-%m %H:%M:%S')
         print('[%s: Starting training.]' % time)
         num_examples_seen = 0
         best_loss = 0
@@ -138,6 +137,8 @@ def train():
                     file_name = FLAGS.checkpoint_dir + '/HRED_model'
                     saver.save(sess, file_name, iteration)
     writer.close()
+    time = datetime.now().strftime('%d-%m %H:%M:%S')
+    print('[%s: Training stopped.]' % time)
     
 def pad_query(query, pad_size=50, q_type='input'):
     """
