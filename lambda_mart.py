@@ -4,7 +4,7 @@ import os
 import pickle as pkl
 import random
 from collections import Counter
-from itertools import izip
+#from itertools import izip
 
 import numpy as np
 import pandas as pd
@@ -153,7 +153,7 @@ def lambdaMart(data, data_val, data_test, experiment_string):
     text_file.close()
 
 def mmr(indexes, ranks):
-    return np.mean([1 / (r[i] + 1.0) for i, r in izip(indexes, ranks)])
+    return np.mean([1 / (r[i] + 1.0) for i, r in zip(indexes, ranks)])
 
 
 

@@ -175,6 +175,7 @@ def test():
     with tf.Session() as sess:        
         saver.restore(sess, tf.train.latest_checkpoint(FLAGS.checkpoint_dir))
         print('Model was restored.')
+#        sess.run(tf.global_variables_initializer()) 
         
         losses = []
         accuracies = []
