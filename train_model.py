@@ -199,7 +199,7 @@ def test():
                 print('-' * 40)
                 print('After %s sessions:' % (j+1))
                 print('Mean loss: %f' % np.mean(losses))
-                print('Mean accuracy : %f' % np.mean(accuracies))            
+                print('Mean accuracy : %f' % np.mean(accuracies))
     
 def pad_query(query, pad_size=50, q_type='input'):
     """
