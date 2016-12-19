@@ -1,4 +1,5 @@
-import cPickle as pickle
+#import cPickle as pickle
+import pickle
 #from model.model import Model
 from features.feature import Feature
 import utils
@@ -13,7 +14,7 @@ class DatasetFeature(Feature):
         if not len(DatasetFeature.features):
             DatasetFeature.features = pickle.load(open(data_file, 'rb'))
         else:
-            print "Features already loaded."
+            print("Features already loaded.")
             
 #        if not DatasetFeature.model:
 #            DatasetFeature.model = Model.load(model_file)

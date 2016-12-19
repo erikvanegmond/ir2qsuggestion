@@ -27,8 +27,8 @@ NUM_LAYERS_DEFAULT = 1
 PADDING_DEFAULT = 50
 CLICK_LEVEL = 5
 # Directory for tensorflow logs
-LOG_DIR_DEFAULT = '../logs/sessionwise'
-CHECKPOINT_DIR_DEFAULT = '../checkpoints/sessionwise'
+LOG_DIR_DEFAULT = '../logs/emb_test'
+CHECKPOINT_DIR_DEFAULT = '../checkpoints/emb_test'
 ### --- END default constants---
 
 def train_step(loss, max_gradient_norm=1.0):
@@ -282,7 +282,7 @@ if __name__ == '__main__':
                         help='Frequency of evaluation on the test set')
     parser.add_argument('--checkpoint_freq', type = int, default = CHECKPOINT_FREQ_DEFAULT,
                         help='Frequency with which the model state is saved.')
-    parser.add_argument('--is_train', type = str, default = False,
+    parser.add_argument('--is_train', type = str, default = True,
                       help='Training or feature extraction')
     parser.add_argument('--resume', type = str, default = False,
                       help='Resume training from latest checkpoint')
