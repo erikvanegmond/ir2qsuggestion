@@ -98,9 +98,8 @@ def vectorify(string):
         except KeyError:
             word = word2index['<unk>']
         vect.append(word)
-    vect = np.append(np.append(word2index['<q>'], vect), word2index['</q>'])
     
-    return vect.astype(np.int32)
+    return np.array(vect, np.int32)
     
 def create_feature_data():
     ADJ = adj.ADJ()

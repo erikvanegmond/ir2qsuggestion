@@ -120,9 +120,10 @@ class HRED(object):
         # Calculate the length of the query (e.g. the part that is not equal to the padding)
         query_len = tf.reduce_sum(tf.cast(tf.not_equal(labels, utils.PAD_ID), tf.int32))
         # Select only the parts that correspond to the actual query
-        lbls = tf.one_hot(labels[:query_len], self.vocab_size, axis=-1)
+        #lbls = tf.one_hot(labels[:query_len], self.vocab_size, axis=-1)
+        lbls = tf.cast(labels[:query_len], tf.int32)
         inpts = tf.cast(logits[:query_len], tf.float32)
-        softmax_loss = tf.nn.softmax_cross_entropy_with_logits(inpts, lbls)
+        softmax_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(inpts, lbls)#tf.nn.softmax_cross_entropy_with_logits(inpts, lbls)
         loss = tf.reduce_mean(softmax_loss)
         tf.summary.scalar('softmax_loss', loss)
         # Add the weight regularization loss

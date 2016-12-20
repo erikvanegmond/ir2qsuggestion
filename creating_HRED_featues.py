@@ -14,25 +14,20 @@ import pickle
 import os
 
 from RNNTensors.TFmodel import HRED
-import features.adj as adj
 import utils
 import lambda_mart as lm
-
-
-ADJ = adj.ADJ()
 
 # The default parameters are the same parameters that you used during practical 1.
 # With these parameters you should get similar results as in the Numpy exercise.
 ### --- BEGIN default constants ---
-DATA_SET_DEFAULT = 'tr'
+DATA_SET_DEFAULT = 'train'
 PADDING_DEFAULT = 50
 Q_DIM_DEFAULT = 1000
 S_DIM_DEFAULT = 1500
 VOCAB_DIM_DEFAULT = 90004
 NUM_LAYERS_DEFAULT = 1
 # Directory for tensorflow logs
-LOG_DIR_DEFAULT = '../logs'
-CHECKPOINT_DIR_DEFAULT = '../checkpoints'
+CHECKPOINT_DIR_DEFAULT = '../checkpoints/plain_model'
 ### --- END default constants---
                 
 def feature_extraction(sessions, long_tail=False):
@@ -41,7 +36,7 @@ def feature_extraction(sessions, long_tail=False):
     """
     feature_file = '../data/HRED_features.tf.pkl'
     # Create model
-    model = HRED(FLAGS.vocab_dim, FLAGS.q_dim, FLAGS.s_dim, FLAGS.num_layers)
+    model = HRED(FLAGS.vocab_dim, FLAGS.q_dim, FLAGS.s_dim, 300, FLAGS.num_layers)
     # Feeds for inputs.
     with tf.variable_scope('input'):
         query = tf.placeholder(tf.int32, [FLAGS.padding,])
@@ -51,6 +46,7 @@ def feature_extraction(sessions, long_tail=False):
     logits, S = model.inference(query, dec_input, s0)
     with tf.variable_scope('prediction'):
         preds = tf.nn.softmax(logits)
+        print(preds)
     # Create a saver.
     saver = tf.train.Saver()
     
@@ -75,7 +71,6 @@ def feature_extraction(sessions, long_tail=False):
                 for j in range(len(anchor_query.split())):
                     [background_count] = lm.bgc.calculate_feature(None, [anchor_query])            
                     if background_count == 0 and len(anchor_query.split()) > 1:
-                        print("shortened")
                         session[-2] = lm.shorten_query(anchor_query)
                     else:
                         break                
@@ -86,18 +81,18 @@ def feature_extraction(sessions, long_tail=False):
                 num_query = utils.vectorify(session[i])
                 x1 = pad_query(num_query, pad_size=FLAGS.padding)
                 num_query = utils.vectorify(session[i+1])
-                x2 = pad_query(num_query, pad_size=FLAGS.padding, q_type='dec_input')   
-                state, l = sess.run([S], feed_dict={query: x1, dec_input: x2, s0: state})            
+                x2 = pad_query(num_query, pad_size=FLAGS.padding, q_type='dec_input')
+                state = sess.run(S, feed_dict={query: x1, dec_input: x2, s0: state})            
             # Get the anchor query 
             anchor_query = session[-2]
-            adj_dict = ADJ.adj_function(anchor_query)
+            adj_dict = lm.adj.adj_function(anchor_query)
             highest_adj_queries = adj_dict['adj_queries']
             if anchor_query not in features.keys():
                 print('Unknown anchor query: ' + anchor_query)
                 features[anchor_query] = {}
             # Calculate the likelihood between the queries
             for sug_query in highest_adj_queries:
-                if sug_query in features[sug_query].keys():
+                if sug_query in features[anchor_query].keys():
                     break
                 else:
                     print('Unknown suggestion: ' + sug_query)
@@ -107,7 +102,7 @@ def feature_extraction(sessions, long_tail=False):
                     x2 = pad_query(num_sug_query, pad_size=FLAGS.padding, q_type='dec_input')
                     y = pad_query(num_sug_query, pad_size=FLAGS.padding, q_type='target')
                     # Get the likelihood from the model
-                    like = sess.run([preds], feed_dict={query: x1, dec_input: x2, s0: state})   
+                    like = sess.run(preds, feed_dict={query: x1, dec_input: x2, s0: state})   
                     features[anchor_query][sug_query] = likelihood(like, y)
                     queries += 1
                     
@@ -120,11 +115,11 @@ def feature_extraction(sessions, long_tail=False):
 def likelihood(preds, target_query):
     # Calculate the query likelihood without taking the padding into account
     L = 1
-    for word in target_query:
+    for i, word in enumerate(target_query):
         if word == utils.PAD_ID:
             break
         else:
-            L *= preds[word]
+            L *= preds[i][word]
     return L
     
 def pad_query(query, pad_size=50, q_type='input'):
@@ -140,20 +135,20 @@ def pad_query(query, pad_size=50, q_type='input'):
     """
     if len(query) < pad_size:
         if q_type == 'input':
-            pad_query = np.array(query + [utils.PAD_ID] * (pad_size - len(query)))
+            pad_query = np.append(query, np.array([utils.PAD_ID] * (pad_size - len(query))))
         elif q_type == 'dec_input':
-            pad_query = np.array([utils.GO_ID] + query + [utils.PAD_ID] * (pad_size - len(query) - 1))
+            pad_query = np.append(np.append(np.array([utils.GO_ID]), query), np.array([utils.PAD_ID] * (pad_size - len(query) - 1)))
         elif q_type == 'target':
-            pad_query = np.array(query + [utils.EOS_ID] + [utils.PAD_ID] * (pad_size - len(query) - 1))
+            pad_query = np.append(np.append(query, np.array([utils.EOS_ID])), np.array([utils.PAD_ID] * (pad_size - len(query) - 1)))
         else:
             pad_query = None
     else:
         if q_type == 'input':
             pad_query = np.array(query[:pad_size])
         elif q_type == 'dec_input':
-            pad_query = np.array([utils.GO_ID] + query[:pad_size-1])
+            pad_query = np.append(np.array([utils.GO_ID]), query[:pad_size-1])
         elif q_type == 'target':
-            pad_query = np.array(query[:pad_size-1] + [utils.EOS_ID])
+            pad_query = np.append(query[:pad_size-1], np.array([utils.EOS_ID]))
         else:
             pad_query = None
         
@@ -172,12 +167,6 @@ def main(_):
     """
     # Print all Flags to confirm parameter settings
     print_flags()
-    # Make directories if they do not exists yet
-    if not tf.gfile.Exists(FLAGS.log_dir):
-      tf.gfile.MakeDirs(FLAGS.log_dir)
-    if not tf.gfile.Exists(FLAGS.checkpoint_dir):
-      tf.gfile.MakeDirs(FLAGS.checkpoint_dir)
-      
     # Load data
     start_time = datetime.now()
     time = start_time.strftime('%d-%m %H:%M:%S')
@@ -215,7 +204,7 @@ if __name__ == '__main__':
                         help='Number of layers in each GRU encoder/decoder')
     parser.add_argument('--padding', type = int, default = PADDING_DEFAULT,
                         help='To what length the queries will be padded.')
-    parser.add_argument('--data_set', type = int, default = DATA_SET_DEFAULT,
+    parser.add_argument('--data_set', type = str, default = DATA_SET_DEFAULT,
                         help='Which data set are we going to use? tr, test or val.')
     parser.add_argument('--checkpoint_dir', type = str, default = CHECKPOINT_DIR_DEFAULT,
                         help='Checkpoint directory')
