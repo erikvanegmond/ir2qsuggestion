@@ -108,12 +108,13 @@ def feature_extraction(sessions):
                 state = sess.run(S, feed_dict={query: x1, dec_input: x2, s0: state})
                 experiments['noisy'] = (n_anchor_query, state)
             
-            for exp in experiments.keys():
-                anchor_query, state = experiments[exp]
+            for exp in ['next_query', 'noisy', 'long_tail']:
                 # If the query was not shortened, the anchor query (and thus the suggestions) are the same as for next_query
                 if exp == 'long_tail' and not shortened:
+                    anchor_query, state = experiments['next_query']
                     features[exp][anchor_query] = features['next_query'][anchor_query]
                     continue
+                anchor_query, state = experiments[exp]
                 adj_dict = lm.adj.adj_function(anchor_query)
                 highest_adj_queries = adj_dict['adj_queries']
                 if anchor_query not in features[exp].keys():
@@ -194,8 +195,6 @@ def main(_):
     """
     Main function
     """
-    # Print all Flags to confirm parameter settings
-    print_flags()
     # Load data
     start_time = datetime.now()
     time = start_time.strftime('%d-%m %H:%M:%S')
