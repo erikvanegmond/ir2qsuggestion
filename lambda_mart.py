@@ -53,11 +53,29 @@ def lambdaMart(data, data_val, data_test, experiment_string):
     # Turn on logging.
     logging.basicConfig(format='%(asctime)s : %(message)s', level=logging.INFO)
 
+#     divide set into train, val and test set
+#     55% train
+#     20% validation
+#     25% test
     query_index_pointers = get_query_index_pointers(data[:, 0])
     query_index_pointers_val = get_query_index_pointers(data_val[:, 0])
     print(query_index_pointers)
     query_index_pointers_test = get_query_index_pointers(data_test[:, 0])
 
+#    train_part_pointer = int(math.floor(query_index_pointers.shape[0] * 0.55))
+#    training_pointers, test_val_pointers = query_index_pointers[:train_part_pointer], query_index_pointers[
+#                                                                                      train_part_pointer - 1:]
+#    val_part = int(math.floor(test_val_pointers.shape[0] * 0.40))
+#    training_length = training_pointers.shape[0]
+#    upper_bound_train = training_pointers[training_length - 1]
+#    validation_pointers = test_val_pointers[:val_part]
+#    validation_length = validation_pointers.shape[0]
+#    upper_bound_val = validation_pointers[validation_length - 1]
+#    test_pointers = test_val_pointers[val_part - 1:]
+#cd
+#    training_queries = data[:upper_bound_train, :]
+#
+#    validation_queries, test_queries = data[upper_bound_train:upper_bound_val, :], data[upper_bound_val:, :]
 
     logging.info('================================================================================')
 
