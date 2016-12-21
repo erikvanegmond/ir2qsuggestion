@@ -1,6 +1,6 @@
-#import cPickle as pickle
-import pickle
-#from model.model import Model
+import cPickle as pickle
+#import pickle
+from model.model import Model
 from features.feature import Feature
 import utils
 
@@ -10,7 +10,7 @@ class DatasetFeature(Feature):
 #    model = None
     unsaved_changes = False
 
-    def __init__(self, data_file="../data/HRED_features.pkl", model_file='../models/29-11_4.589_0_90005x1000x90005.npz'):
+    def __init__(self, data_file="../data/seq2seq_features.pkl", model_file='../models/29-11_4.589_0_90005x1000x90005.npz'):
         if not len(DatasetFeature.features):
             DatasetFeature.features = pickle.load(open(data_file, 'rb'))
         else:
@@ -19,14 +19,14 @@ class DatasetFeature(Feature):
         if not DatasetFeature.model:
             DatasetFeature.model = Model.load(model_file)
         else:
-            print "Model already loaded."
+            print ("Model already loaded.")
             
-    def save(self, data_file="../data/HRED_features.pkl"):
+    def save(self, data_file="../data/seq2seq_features.pkl"):
         if DatasetFeature.unsaved_changes:
             pickle.dump(DatasetFeature.features, open(data_file, 'wb'))
 
 class HRED(DatasetFeature):
-   @staticmethod
+    @staticmethod
     def calculate_feature(compared_query, queries):
         fts = []
 
