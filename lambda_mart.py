@@ -1,35 +1,35 @@
 import logging
-import math
-import os
-import pickle as pkl
-import random
+#import math
+#import os
+#import pickle as pkl
+#import random
 from collections import Counter
-#from itertools import izip
+from itertools import izip
 
 import numpy as np
 import pandas as pd
 #from rankpy.models import LambdaMART
 #from rankpy.queries import Queries
 
-hred_use = False
+hred_use = True
 training = True
 
 import features.adj as ad
-#import features.cossimilar as cs
-#import features.length as lg
-#import features.lengthdiff as ld
-#import features.levenstein as levs
-#if hred_use == True:
-#    import features.HRED as hredf
+import features.cossimilar as cs
+import features.length as lg
+import features.lengthdiff as ld
+import features.levenstein as levs
+if hred_use == True:
+    import features.HRED as hredf
 import features.bg_count as bgcount
 
 adj = ad.ADJ()
-#lev = levs.Levenshtein()
-#lendif = ld.LengthDiff()
-#leng = lg.Length()
-#coss = cs.CosineSimilarity()
-#if hred_use == True:
-#    hred = hredf.HRED()
+lev = levs.Levenshtein()
+lendif = ld.LengthDiff()
+leng = lg.Length()
+coss = cs.CosineSimilarity()
+if hred_use == True:
+    hred = hredf.HRED()
 bgc = bgcount.BgCount()
 
 

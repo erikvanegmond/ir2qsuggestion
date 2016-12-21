@@ -60,10 +60,11 @@ print('[Creating next_query features.]')
 # create_next_query_csv()
 # create_noisy_query_csv()
 sessions_tr = lm.adj.find_suitable_sessions("../data/lm_train_sessions.pkl")
-create_next_query_csv(sessions=sessions_tr)
 sessions_val = lm.adj.find_suitable_sessions("../data/lm_val_sessions.pkl")
-create_next_query_csv(sessions=sessions_val)
 sessions_test = lm.adj.find_suitable_sessions("../data/lm_test_sessions.pkl")
+
+create_next_query_csv(sessions=sessions_tr)
+create_next_query_csv(sessions=sessions_val)
 create_next_query_csv(sessions=sessions_test)
 
 print('[Creating noisy_query features.]')
