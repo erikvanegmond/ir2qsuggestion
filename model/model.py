@@ -75,7 +75,7 @@ class Model:
             likelhood,
             sequences=y_x,
             outputs_info=[None, dict(initial=vector_rep)])
-        l_hood = T.prod(o_d_like)
+        l_hood = T.sum(T.log(o_d_like))
 
         cost = T.sum(T.nnet.categorical_crossentropy(o_d, y_d))
 
