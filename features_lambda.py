@@ -28,7 +28,7 @@ def aug_data(data):
 # Do LambdaMart for 3 different scenario's
 # 1 Next-QueryPrediction (when anchor query exists in background data)
 # for each session:
-def create_next_query_csv():
+def create_next_query_csv(sessions):
     print('[Creating dataset for next_query predictions.]')
     experiment_string = "next_query_val"
     print("Performing experiment: " + experiment_string)
@@ -38,7 +38,7 @@ def create_next_query_csv():
 
 ## 2 RobustPrediction (when the context is perturbed with overly common queries)
 ## label 100 most frequent queries in the background set as noisy
-def create_noisy_query_csv():
+def create_noisy_query_csv(sessions):
     experiment_string = "noisy_val"
     print("Performing experiment: " + experiment_string)
     noisy_query_sessions = lm.noisy_query_prediction(sessions)
@@ -56,12 +56,32 @@ def create_longtail_query_csv(sessions1, experiment_string):
     print("---" * 30)
     lm.hred.save()
 
-print('[Creating long_tail features.]')
+print('[Creating next_query features.]')
 # create_next_query_csv()
 # create_noisy_query_csv()
 sessions_tr = lm.adj.find_suitable_sessions("../data/lm_train_sessions.pkl")
-create_longtail_query_csv(sessions=sessions_tr,experiment_string="long_tail_train")
+create_next_query_csv(sessions=sessions_tr)
 sessions_val = lm.adj.find_suitable_sessions("../data/lm_val_sessions.pkl")
-create_longtail_query_csv(sessions=sessions_val,experiment_string="long_tail_val")
+create_next_query_csv(sessions=sessions_val)
 sessions_test = lm.adj.find_suitable_sessions("../data/lm_test_sessions.pkl")
+create_next_query_csv(sessions=sessions_test)
+
+print('[Creating noisy_query features.]')
+# create_next_query_csv()
+# create_noisy_query_csv()
+#sessions_tr = lm.adj.find_suitable_sessions("../data/lm_train_sessions.pkl")
+create_noisy_query_csv(sessions=sessions_tr)
+#sessions_val = lm.adj.find_suitable_sessions("../data/lm_val_sessions.pkl")
+create_noisy_query_csv(sessions=sessions_val)
+#sessions_test = lm.adj.find_suitable_sessions("../data/lm_test_sessions.pkl")
+create_noisy_query_csv(sessions=sessions_test)
+    
+print('[Creating long_tail features.]')
+# create_next_query_csv()
+# create_noisy_query_csv()
+#sessions_tr = lm.adj.find_suitable_sessions("../data/lm_train_sessions.pkl")
+create_longtail_query_csv(sessions=sessions_tr,experiment_string="long_tail_train")
+#sessions_val = lm.adj.find_suitable_sessions("../data/lm_val_sessions.pkl")
+create_longtail_query_csv(sessions=sessions_val,experiment_string="long_tail_val")
+#sessions_test = lm.adj.find_suitable_sessions("../data/lm_test_sessions.pkl")
 create_longtail_query_csv(sessions=sessions_test,experiment_string="long_tail_test")
