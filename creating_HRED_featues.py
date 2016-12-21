@@ -27,14 +27,18 @@ S_DIM_DEFAULT = 1500
 VOCAB_DIM_DEFAULT = 90004
 NUM_LAYERS_DEFAULT = 1
 # Directory for tensorflow logs
-CHECKPOINT_DIR_DEFAULT = '../checkpoints/plain_model'
+CHECKPOINT_DIR_DEFAULT = '../checkpoints/sessionwise'
 ### --- END default constants---
                 
-def feature_extraction(sessions, long_tail=False):
+def feature_extraction(sessions):
     """
     This method is used to retrieve the likelohood of different query pairs, given a session.
     """
-    feature_file = '../data/HRED_features.tf.pkl'
+    noisy_query_sessions = lm.noisy_query_prediction(sessions)    
+    
+#    next_query_file = '../data/HRED_features.next_query.tf.pkl'
+#    noisy_file = '../data/HRED_features.noisy.tf.pkl'
+#    long_tail_file = '../data/HRED_features.long_tail.tf.pkl'
     # Create model
     model = HRED(FLAGS.vocab_dim, FLAGS.q_dim, FLAGS.s_dim, 300, FLAGS.num_layers)
     # Feeds for inputs.
@@ -46,70 +50,96 @@ def feature_extraction(sessions, long_tail=False):
     logits, S = model.inference(query, dec_input, s0)
     with tf.variable_scope('prediction'):
         preds = tf.nn.softmax(logits)
-        print(preds)
     # Create a saver.
     saver = tf.train.Saver()
     
     with tf.Session() as sess:        
         saver.restore(sess, tf.train.latest_checkpoint(FLAGS.checkpoint_dir))
         print('Model was restored.')
-        if os.path.isfile(feature_file):
-            print('[%s already exists, opening file...]')
-            features = pickle.load(open(feature_file, 'rb'))
-        else:
-            features = {}
+        features = {'next_query':{}, 'noisy':{}, 'long_tail':{}}
         queries = 0
         
         start_time = datetime.now()
         time = start_time.strftime('%d-%m %H:%M:%S')
         print("[%s: Creating features...]" % time)
-        for session in sessions:           
-            if long_tail:
-                anchor_query = session[-2]
-                # Iteratively shorten anchor query by dropping terms
-                # until we have a query that appears in the Background data
-                for j in range(len(anchor_query.split())):
-                    [background_count] = lm.bgc.calculate_feature(None, [anchor_query])            
-                    if background_count == 0 and len(anchor_query.split()) > 1:
-                        session[-2] = lm.shorten_query(anchor_query)
-                    else:
-                        break                
+        for s in range(len(sessions)):
+            session = sessions[s]
+            noisy_session = noisy_query_sessions[s]
+            experiments = {'next_query':(), 'noisy':(), 'long_tail':()}
+            # Get the anchor queries
+            anchor_query = session[-2]
+            n_anchor_query = noisy_session[-2]
+            lt_anchor_query = session[-2]
+            # Iteratively shorten anchor query by dropping terms
+            # until we have a query that appears in the Background data
+            shortened = False
+            for j in range(len(lt_anchor_query.split())):
+                [background_count] = lm.bgc.calculate_feature(None, [lt_anchor_query])            
+                if background_count == 0 and len(lt_anchor_query.split()) > 1:
+                    lt_anchor_query = lm.shorten_query(lt_anchor_query)
+                    shortened = True
+                else:
+                    break                
             # Encode the session
             state = np.zeros((1,FLAGS.s_dim))
             for i in range(len(session)-2):
                 # Go through the session step by step to get the session encoding up until the ancor query
                 num_query = utils.vectorify(session[i])
                 x1 = pad_query(num_query, pad_size=FLAGS.padding)
+                # For the long_tail experiment we need to change the anchor query
+                if i == len(session)-3 and shortened:
+                    num_query = utils.vectorify(lt_anchor_query)
+                    x2 = pad_query(num_query, pad_size=FLAGS.padding, q_type='dec_input')
+                    lt_state = sess.run(S, feed_dict={query: x1, dec_input: x2, s0: state})
+                    experiments['long_tail'] = (lt_anchor_query, lt_state)
                 num_query = utils.vectorify(session[i+1])
                 x2 = pad_query(num_query, pad_size=FLAGS.padding, q_type='dec_input')
-                state = sess.run(S, feed_dict={query: x1, dec_input: x2, s0: state})            
-            # Get the anchor query 
-            anchor_query = session[-2]
-            adj_dict = lm.adj.adj_function(anchor_query)
-            highest_adj_queries = adj_dict['adj_queries']
-            if anchor_query not in features.keys():
-                print('Unknown anchor query: ' + anchor_query)
-                features[anchor_query] = {}
-            # Calculate the likelihood between the queries
-            for sug_query in highest_adj_queries:
-                if sug_query in features[anchor_query].keys():
-                    break
-                else:
-                    print('Unknown suggestion: ' + sug_query)
-                    num_anchor_query = utils.vectorify(anchor_query)
-                    x1 = pad_query(num_anchor_query, pad_size=FLAGS.padding)
-                    num_sug_query = utils.vectorify(sug_query)
-                    x2 = pad_query(num_sug_query, pad_size=FLAGS.padding, q_type='dec_input')
-                    y = pad_query(num_sug_query, pad_size=FLAGS.padding, q_type='target')
-                    # Get the likelihood from the model
-                    like = sess.run(preds, feed_dict={query: x1, dec_input: x2, s0: state})   
-                    features[anchor_query][sug_query] = likelihood(like, y)
-                    queries += 1
+                state = sess.run(S, feed_dict={query: x1, dec_input: x2, s0: state})
+                experiments['next_query'] = (anchor_query, state)
+                
+            # Encode the noisy session
+            state = np.zeros((1,FLAGS.s_dim))
+            for i in range(len(noisy_session)-2):
+                # Go through the session step by step to get the session encoding up until the ancor query
+                num_query = utils.vectorify(noisy_session[i])
+                x1 = pad_query(num_query, pad_size=FLAGS.padding)
+                num_query = utils.vectorify(noisy_session[i+1])
+                x2 = pad_query(num_query, pad_size=FLAGS.padding, q_type='dec_input')
+                state = sess.run(S, feed_dict={query: x1, dec_input: x2, s0: state})
+                experiments['noisy'] = (n_anchor_query, state)
+            
+            for exp in ['next_query', 'noisy', 'long_tail']:
+                # If the query was not shortened, the anchor query (and thus the suggestions) are the same as for next_query
+                if exp == 'long_tail' and not shortened:
+                    anchor_query, state = experiments['next_query']
+                    features[exp][anchor_query] = features['next_query'][anchor_query]
+                    continue
+                anchor_query, state = experiments[exp]
+                adj_dict = lm.adj.adj_function(anchor_query)
+                highest_adj_queries = adj_dict['adj_queries']
+                if anchor_query not in features[exp].keys():
+                    print(exp + ': Unknown anchor query: ' + anchor_query)
+                    features[exp][anchor_query] = {}
+                # Calculate the likelihood between the queries
+                for sug_query in highest_adj_queries:
+                    if sug_query in features[exp][anchor_query].keys():
+                        continue
+                    else:
+                        num_anchor_query = utils.vectorify(anchor_query)
+                        x1 = pad_query(num_anchor_query, pad_size=FLAGS.padding)
+                        num_sug_query = utils.vectorify(sug_query)
+                        x2 = pad_query(num_sug_query, pad_size=FLAGS.padding, q_type='dec_input')
+                        y = pad_query(num_sug_query, pad_size=FLAGS.padding, q_type='target')
+                        # Get the likelihood from the model
+                        like = sess.run(preds, feed_dict={query: x1, dec_input: x2, s0: state})   
+                        features[exp][anchor_query][sug_query] = likelihood(like, y)
+            queries += 1
                     
             if queries % 10000 == 0:
-                print("[Visited %s anchor queries.]" % (queries))
-        print("[Saving features %s features.]" % (len(features)))
-        pickle.dump(features, open(feature_file, 'wb'))
+                print("[Visited %s anchor queries. It took %d seconds.]" % (queries, (datetime.now() - start_time).seconds))
+        print("[Saving features %s features.]" % (queries))
+        for exp, f in features:
+            pickle.dump(f, open('../data/HRED_features.'+exp+'.tf.pkl', 'wb'))
         print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
         
 def likelihood(preds, target_query):
@@ -165,8 +195,6 @@ def main(_):
     """
     Main function
     """
-    # Print all Flags to confirm parameter settings
-    print_flags()
     # Load data
     start_time = datetime.now()
     time = start_time.strftime('%d-%m %H:%M:%S')
@@ -178,18 +206,19 @@ def main(_):
     print("[Loaded %s test sessions. It took %f seconds.]" % (len(sessions), (datetime.now() - start_time).seconds))
     
     # Run feature extraction
-    print('[Creating dataset for next_query predictions.]')
     feature_extraction(sessions)
-    print("---" * 30)
-    
-    print('[Creating dataset for noisy_query predictions.]')
-    noisy_query_sessions = lm.noisy_query_prediction(sessions)
-    feature_extraction(noisy_query_sessions)
-    print("---" * 30)
-    
-    print('[Creating dataset for long_tail_query predictions.]')
-    feature_extraction(sessions, True)
-    print("---" * 30)
+#    print('[Creating dataset for next_query predictions.]')
+#    feature_extraction(sessions, 'next_query')
+#    print("---" * 30)
+#    
+#    print('[Creating dataset for noisy_query predictions.]')
+#    noisy_query_sessions = lm.noisy_query_prediction(sessions)
+#    feature_extraction(noisy_query_sessions, 'noisy')
+#    print("---" * 30)
+#    
+#    print('[Creating dataset for long_tail_query predictions.]')
+#    feature_extraction(sessions, 'long_tail', True)
+#    print("---" * 30)
 
 if __name__ == '__main__':
     # Command line arguments
