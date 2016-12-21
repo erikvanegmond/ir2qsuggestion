@@ -4,32 +4,32 @@ import os
 import pickle as pkl
 import random
 from collections import Counter
-from itertools import izip
+#from itertools import izip
 
 import numpy as np
 import pandas as pd
-from rankpy.models import LambdaMART
-from rankpy.queries import Queries
+#from rankpy.models import LambdaMART
+#from rankpy.queries import Queries
 
-hred_use = True
+hred_use = False
 training = True
 
 import features.adj as ad
-import features.cossimilar as cs
-import features.length as lg
-import features.lengthdiff as ld
-import features.levenstein as levs
-if hred_use == True:
-    import features.HRED as hredf
+#import features.cossimilar as cs
+#import features.length as lg
+#import features.lengthdiff as ld
+#import features.levenstein as levs
+#if hred_use == True:
+#    import features.HRED as hredf
 import features.bg_count as bgcount
 
 adj = ad.ADJ()
-lev = levs.Levenshtein()
-lendif = ld.LengthDiff()
-leng = lg.Length()
-coss = cs.CosineSimilarity()
-if hred_use == True:
-    hred = hredf.HRED()
+#lev = levs.Levenshtein()
+#lendif = ld.LengthDiff()
+#leng = lg.Length()
+#coss = cs.CosineSimilarity()
+#if hred_use == True:
+#    hred = hredf.HRED()
 bgc = bgcount.BgCount()
 
 
@@ -108,7 +108,7 @@ def lambdaMart(data, data_val, data_test, experiment_string):
 
     logging.info('================================================================================')
 
-    model = LambdaMART(metric='nDCG@20', n_estimators=30, subsample=0.5)
+    model = LambdaMART(metric='nDCG@20', n_estimators=30) #, subsample=0.5)
     if training:
         model.fit(training_queries, validation_queries=validation_queries)
     else:
@@ -129,7 +129,7 @@ def lambdaMart(data, data_val, data_test, experiment_string):
     indexes_ones = [q % 20 for q, [x] in enumerate(data_test[:, :1]) if x == 1.0]
     mean_rank = mmr(indexes_ones, rankings)
 
-    text_file = open("Results" + experiment_string + ".txt", "w")
+    text_file = open("Results" + experiment_string + "sub.txt", "w")
 
     text_file.write("ADJ MRR: %s" % mean_rank)
     logging.info('MRR: %s' % mean_rank)
@@ -259,19 +259,28 @@ def make_long_tail_set(sessions, experiment_string):
     headers = create_dataframe_headers()
     for session in sessions:
         # get anchor query and target query from session
+        not_longtail = False
         anchor_query = session[-2]
         target_query = session[-1]
         # Cannot use ADJ
         # Therefore iteratively shorten anchor query by dropping terms
         # until we have a query that appears in the Background data
-        for j in range(len(anchor_query.split())):
+        for i,j in enumerate(range(len(anchor_query.split()))):
             [background_count] = bgc.calculate_feature(None, [anchor_query])
-
+            if background_count == 0 and len(anchor_query.split()) == 1:
+                not_longtail = True
+                break
             if background_count == 0 and len(anchor_query.split()) > 1:
                 print("shortened")
                 anchor_query = shorten_query(anchor_query)
             else:
-                break
+                if i > 0:
+                    break
+                else:
+                    not_longtail = True
+                    break
+        if not_longtail:
+            continue
         features, highest_adj_queries = create_features(anchor_query, session)
         if len(highest_adj_queries) < 20:
             continue
@@ -308,20 +317,24 @@ def count_query_frequency():
 
 def get_random_noise(noise_prob):
     norm = sum(noise_prob.values())
-    probs = np.array(noise_prob.values(), np.float32) / norm
+    probs = np.array(list(noise_prob.values()), np.float32) / norm
     # probability of sampling a noisy query is proportional to frequency of query in background set
-    return np.random.choice(noise_prob.keys(), p=probs)
+    return np.random.choice(list(noise_prob.keys()), p=probs)
 
 def noisy_query_prediction(sessions):
     print('[Creating noisy queries.]')
+    newSessCollec = []
+    newSess = []
     noise_freq = count_query_frequency()
     for session in sessions:
         # for each entry in the training, val and test set insert noisy query at random position
         random_place = np.random.randint(0, len(session)-1)
         noise = get_random_noise(noise_freq)
-        session.insert(random_place, noise)
-    noisy_sessions = sessions
-    return noisy_sessions
+        newSess = session[:]
+        newSess.insert(random_place, noise)
+        newSessCollec.append(newSess)
+#    noisy_sessions = sessions
+    return newSessCollec
 
 
 # Do LambdaMart for 3 different scenario's
