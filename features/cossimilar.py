@@ -23,7 +23,10 @@ class CosineSimilarity(Feature):
                 dot += cq_vector_count[i] * c[i]
 
             l_q = CosineSimilarity.vector_len(c)
-            features.append(dot/(l_cq*l_q))
+            try:
+                features.append(dot/(l_cq*l_q))
+            except:
+                features.append(0)
             # I don't think this makes sence as the queries in this method are not necessarily the coocurence queries
             # Feature.cooccurrences[compared_query]['cosinesimilarity'] = features
         return features
