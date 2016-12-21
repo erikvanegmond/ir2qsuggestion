@@ -14,7 +14,6 @@ import pandas as pd
 hred_use = False
 training = True
 
-<<<<<<< HEAD
 import features.adj as ad
 #import features.cossimilar as cs
 #import features.length as lg
@@ -32,25 +31,6 @@ adj = ad.ADJ()
 #if hred_use == True:
 #    hred = hredf.HRED()
 bgc = bgcount.BgCount()
-=======
-# import features.adj as ad
-# import features.cossimilar as cs
-# import features.length as lg
-# import features.lengthdiff as ld
-# import features.levenstein as levs
-# if hred_use == True:
-#     import features.HRED as hredf
-# import features.bg_count as bgcount
-#
-# adj = ad.ADJ()
-# lev = levs.Levenshtein()
-# lendif = ld.LengthDiff()
-# leng = lg.Length()
-# coss = cs.CosineSimilarity()
-# if hred_use == True:
-#     hred = hredf.HRED()
-# bgc = bgcount.BgCount()
->>>>>>> f668d18da7d12d6a0b0777014513c6ee46d0dadb
 
 
 def get_query_index_pointers(dataset):
