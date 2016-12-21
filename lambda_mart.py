@@ -4,32 +4,32 @@ import os
 import pickle as pkl
 import random
 from collections import Counter
-from itertools import izip
+#from itertools import izip
 
 import numpy as np
 import pandas as pd
-from rankpy.models import LambdaMART
-from rankpy.queries import Queries
+#from rankpy.models import LambdaMART
+#from rankpy.queries import Queries
 
-hred_use = True
+hred_use = False
 training = True
 
 import features.adj as ad
-import features.cossimilar as cs
-import features.length as lg
-import features.lengthdiff as ld
-import features.levenstein as levs
-if hred_use == True:
-    import features.HRED as hredf
+#import features.cossimilar as cs
+#import features.length as lg
+#import features.lengthdiff as ld
+#import features.levenstein as levs
+#if hred_use == True:
+#    import features.HRED as hredf
 import features.bg_count as bgcount
 
 adj = ad.ADJ()
-lev = levs.Levenshtein()
-lendif = ld.LengthDiff()
-leng = lg.Length()
-coss = cs.CosineSimilarity()
-if hred_use == True:
-    hred = hredf.HRED()
+#lev = levs.Levenshtein()
+#lendif = ld.LengthDiff()
+#leng = lg.Length()
+#coss = cs.CosineSimilarity()
+#if hred_use == True:
+#    hred = hredf.HRED()
 bgc = bgcount.BgCount()
 
 
@@ -308,9 +308,9 @@ def count_query_frequency():
 
 def get_random_noise(noise_prob):
     norm = sum(noise_prob.values())
-    probs = np.array(noise_prob.values(), np.float32) / norm
+    probs = np.array(list(noise_prob.values()), np.float32) / norm
     # probability of sampling a noisy query is proportional to frequency of query in background set
-    return np.random.choice(noise_prob.keys(), p=probs)
+    return np.random.choice(list(noise_prob.keys()), p=probs)
 
 def noisy_query_prediction(sessions):
     print('[Creating noisy queries.]')
