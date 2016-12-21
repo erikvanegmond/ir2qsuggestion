@@ -7,15 +7,17 @@ import argparse
 import tensorflow as tf
 import numpy as np
 from datetime import datetime
+import pickle
 
 from RNNTensors.TFmodel import HRED
+import features.adj as adj
 from sessionizer import Sessionizer
 import utils
 
 # The default parameters are the same parameters that you used during practical 1.
 # With these parameters you should get similar results as in the Numpy exercise.
 ### --- BEGIN default constants ---
-LEARNING_RATE_DEFAULT = 0.1#2e-3
+LEARNING_RATE_DEFAULT = 2e-3
 MAX_STEPS_DEFAULT = 1500
 EVAL_FREQ_DEFAULT = 100
 CHECKPOINT_FREQ_DEFAULT = 1000
@@ -27,18 +29,9 @@ NUM_LAYERS_DEFAULT = 1
 PADDING_DEFAULT = 50
 CLICK_LEVEL = 5
 # Directory for tensorflow logs
-LOG_DIR_DEFAULT = '../logs/emb_test'
-CHECKPOINT_DIR_DEFAULT = '../checkpoints/emb_test'
+LOG_DIR_DEFAULT = '../click_logs'
+CHECKPOINT_DIR_DEFAULT = '../click_checkpoints'
 ### --- END default constants---
-
-def train_step(loss, max_gradient_norm=1.0):
-    global_step = tf.Variable(0, trainable=False)
-    params = tf.trainable_variables()
-    learning_rate = tf.train.exponential_decay(FLAGS.learning_rate, global_step, 300, 0.96, staircase=True)
-    opt = tf.train.GradientDescentOptimizer(learning_rate)
-    gradients = tf.gradients(loss, params)
-    clipped_gradients, norm = tf.clip_by_global_norm(gradients, max_gradient_norm)
-    return opt.apply_gradients(zip(clipped_gradients, params), global_step=global_step)
 
 def train():
     # Set the random seeds for reproducibility.
@@ -47,26 +40,30 @@ def train():
     
     snizer = Sessionizer()
     train_sess = snizer.get_sessions_with_numbers()
+    train_sess_clicks = snizer.get_sessions_clickBool_clickRank()
     snizer = Sessionizer('../data/val_session')
     val_sess = snizer.get_sessions_with_numbers()
     # Choose a random subset to validate on, because otherwise the validation takes too long
-    val_sess = np.random.choice(val_sess, 50)
+    val_sess = np.random.choice(val_sess, 10)
     # Create model
     model = HRED(FLAGS.vocab_dim, FLAGS.q_dim, FLAGS.s_dim, 300, FLAGS.num_layers)
+    print('[Model was created.]')
     # Feeds for inputs.
     with tf.variable_scope('input'):
         query = tf.placeholder(tf.int32, [FLAGS.padding,])
         dec_input = tf.placeholder(tf.int32, [FLAGS.padding,])
         target = tf.placeholder(tf.int32, [FLAGS.padding,])
         s0 = tf.placeholder(tf.float32, [1, FLAGS.s_dim])
+        click_hot = tf.placeholder(tf.float32, shape=(1,FLAGS.click_level))
+        #click_rank = tf.placeholder(tf.int32, shape=(1, 1))#tf.placeholder(tf.int32, shape=(), name="init")#tf.placeholder(tf.int32, shape=(1, FLAGS.click_level))
+    print (click_hot)
     # Data pipeline
-    logits, S = model.inference(query, dec_input, s0)
+    logits, S = model.inference(query, dec_input, s0, click_hot)
     loss = model.loss(logits, target)
     acc = model.accuracy(logits, target)
     # Initialize optimizer
-    #opt = tf.train.RMSPropOptimizer(FLAGS.learning_rate)
-    opt_operation = train_step(loss)
-    print('[Model was created.]')
+    opt = tf.train.RMSPropOptimizer(FLAGS.learning_rate)
+    opt_operation = opt.minimize(loss)
     # Create a saver.
     saver = tf.train.Saver()
 #    
@@ -77,38 +74,45 @@ def train():
         train_writer = []#tf.summary.FileWriter(FLAGS.log_dir + '/train', sess.graph)
         test_writer = []#tf.summary.FileWriter(FLAGS.log_dir + '/test')
         # Initialize variables
-        if FLAGS.resume:# == 'True':
+        if FLAGS.resume == 'True':
             saver.restore(sess, tf.train.latest_checkpoint(FLAGS.checkpoint_dir))
-            print('[Latest model was restored.]')
         else:
-            sess.run(tf.global_variables_initializer()) 
-            print('[Initialized variables.]')
+            sess.run(tf.global_variables_initializer())     
 #         Do a loop
-        time = datetime.now().strftime('%d-%m %H:%M:%S')
+        start_time = datetime.now()
+        time = start_time.strftime('%d-%m %H:%M:%S')
         print('[%s: Starting training.]' % time)
         num_examples_seen = 0
         best_loss = 0
-        for iteration in range(len(train_sess)):#range(FLAGS.max_steps):
+        for iteration in range(FLAGS.max_steps):
             # Select a random session to train on.
-            session = train_sess[iteration]#np.random.choice(train_sess)
+            session = np.random.choice(train_sess)
+            idx = train_sess.index(session)
+            session_clicks = train_sess_clicks[idx]
+            click_ranks = [x[1]-1 if x[1] <=2 else -1 for x in session_clicks]
             state = np.zeros((1,FLAGS.s_dim))
-            #losses = []
+            losses = []
             for i in range(len(session)-1):
-                # Loop over the session and predict each query using the previous ones                
+                # Loop over the session and predict each query using the previous ones
+                
                 x1 = pad_query(session[i], pad_size=FLAGS.padding)
                 x2 = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='dec_input')
                 y = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='target')
-                
-                if i < len(session)-2:
-                    state = sess.run(S, feed_dict={query: x1, dec_input: x2, target: y, s0: state})
-                else:
+                z = np.zeros([FLAGS.click_level])
+                z[click_ranks[i]] = 1
+                z = np.reshape(z, (1, 5))
+                if i == len(session)-2:
                     # We're at the anchor query of this session
-                    _, l, summary = sess.run([opt_operation, loss, merged], feed_dict={query: x1, dec_input: x2, target: y, s0: state})
+                    print("anchor")
+                    _, l, summary = sess.run([opt_operation, loss, merged], feed_dict={query: x1, dec_input: x2, target: y, s0: state, click_hot: z})
                     writer.add_summary(summary, iteration)
-                #losses.append(l)
+                else:
+                    print("otherwise")
+                    _, state, l = sess.run([opt_operation, S, loss], feed_dict={query: x1, dec_input: x2, target: y, s0: state, click_hot: z})
+                losses.append(l)
                 num_examples_seen += 1
             # Append the loss of this session to the training data
-            train_writer.append(l)#np.mean(losses))
+            train_writer.append(np.mean(losses))
             if (iteration+1) % FLAGS.print_freq == 0:
                 print('Visited %s examples of %s sessions. Loss: %f' % (num_examples_seen, iteration+1, train_writer[-1]))
             # Evaluate the model
@@ -125,9 +129,9 @@ def train():
                         y = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='target')
                         
                         if i < len(session)-2:
-                            state, l = sess.run([S, loss], feed_dict={query: x1, dec_input: x2, target: y, s0: state})
+                            state, l = sess.run([S, loss], feed_dict={query: x1, dec_input: x2, target: y, s0: state, click_hot: z})
                         else:
-                            state, l, accuracy = sess.run([S, loss, acc], feed_dict={query: x1, dec_input: x2, target: y, s0: state})
+                            state, l, accuracy = sess.run([S, loss, acc], feed_dict={query: x1, dec_input: x2, target: y, s0: state, click_hot: z})
                             accs.append(accuracy)
                         losses.append(l)
                     val_losses.append(np.mean(losses))
@@ -148,58 +152,6 @@ def train():
                     file_name = FLAGS.checkpoint_dir + '/HRED_model'
                     saver.save(sess, file_name, iteration)
     writer.close()
-    time = datetime.now().strftime('%d-%m %H:%M:%S')
-    print('[%s: Training finished.]' % time)
-    
-def test():
-    """
-    This method calculates the mean loss and accuracy of the model
-    """
-    snizer = Sessionizer('../data/test_session')
-    test_sess = snizer.get_sessions_with_numbers()
-    # Create model
-    model = HRED(FLAGS.vocab_dim, FLAGS.q_dim, FLAGS.s_dim, 300, FLAGS.num_layers)
-    # Feeds for inputs.
-    with tf.variable_scope('input'):
-        query = tf.placeholder(tf.int32, [FLAGS.padding,])
-        dec_input = tf.placeholder(tf.int32, [FLAGS.padding,])
-        target = tf.placeholder(tf.int32, [FLAGS.padding,])
-        s0 = tf.placeholder(tf.float32, [1, FLAGS.s_dim])
-    # Data pipeline
-    logits, S = model.inference(query, dec_input, s0)
-    loss = model.loss(logits, target)
-    acc = model.accuracy(logits, target)
-    # Create a saver.
-    saver = tf.train.Saver()
-    
-    with tf.Session() as sess:        
-        saver.restore(sess, tf.train.latest_checkpoint(FLAGS.checkpoint_dir))
-        print('Model was restored.')
-#        sess.run(tf.global_variables_initializer()) 
-        
-        losses = []
-        accuracies = []
-        for j, session in enumerate(test_sess):
-            # Encode the session
-            state = np.zeros((1,FLAGS.s_dim))
-            for i in range(len(session)-1):
-                # Loop over the session and predict each query using the previous ones                
-                x1 = pad_query(session[i], pad_size=FLAGS.padding)
-                x2 = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='dec_input')
-                y = pad_query(session[i+1], pad_size=FLAGS.padding, q_type='target')
-                
-                if i < len(session)-2:
-                    state = sess.run(S, feed_dict={query: x1, dec_input: x2, target: y, s0: state})
-                else:
-                    # We're at the anchor query of this session
-                    l, accuracy = sess.run([loss, acc], feed_dict={query: x1, dec_input: x2, target: y, s0: state})
-                    losses.append(l)
-                    accuracies.append(accuracy)
-            if (j+1)%FLAGS.print_freq == 0:
-                print('-' * 40)
-                print('After %s sessions:' % (j+1))
-                print('Mean loss: %f' % np.mean(losses))
-                print('Mean accuracy : %f' % np.mean(accuracies))
     
 def pad_query(query, pad_size=50, q_type='input'):
     """
@@ -212,6 +164,7 @@ def pad_query(query, pad_size=50, q_type='input'):
     Returns:
       pad_query: a list of indices representing the padded query
     """
+    print(query)
     if len(query) < pad_size:
         if q_type == 'input':
             pad_query = np.array(query + [utils.PAD_ID] * (pad_size - len(query)))
@@ -251,13 +204,9 @@ def main(_):
       tf.gfile.MakeDirs(FLAGS.log_dir)
     if not tf.gfile.Exists(FLAGS.checkpoint_dir):
       tf.gfile.MakeDirs(FLAGS.checkpoint_dir)
-    
-    if not FLAGS.is_train:# == 'False':
-        print('Going to test latest model in directory %s' % FLAGS.checkpoint_dir)
-        test()
-    else:
-        # Run the training operation
-        train()
+      
+    # Run the training operation
+    train()
 
 if __name__ == '__main__':
     # Command line arguments
@@ -290,6 +239,8 @@ if __name__ == '__main__':
                         help='Summaries log directory')
     parser.add_argument('--checkpoint_dir', type = str, default = CHECKPOINT_DIR_DEFAULT,
                         help='Checkpoint directory')
+    parser.add_argument('--click_level', type = int, default = CLICK_LEVEL,
+                        help='Click level for the click feature')
     FLAGS, unparsed = parser.parse_known_args()
     
     tf.app.run()

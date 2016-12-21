@@ -35,10 +35,11 @@ class HRED(object):
     self.num_samples = num_samples
     self.is_training = is_training
     
-    self.init = tf.random_normal_initializer(stddev=1e-2)
+    self.init = tf.random_normal_initializer(stddev=1e-3)
     self.reg = regularizers.l2_regularizer(1e-2)
+    self.counter = 0
 
-  def inference(self, query, target, sess_enc):
+  def inference(self, query, target, sess_enc, click_hot):
     """
     Given a session x, this method will encode each query in x. After that it
     will encode the session given the query states. Eventually a new query will
@@ -51,7 +52,7 @@ class HRED(object):
       logits: a tensor of shape [num_of_target_words, q_dim] representing the decoded query
     """
     with tf.variable_scope('HRED'):        
-        E = tf.get_variable('embedding', (self.vocab_size, self.q_dim), initializer=self.init)#, regularizer=self.reg)
+        E = tf.get_variable('embedding', (self.vocab_size, self.q_dim), initializer=self.init, regularizer=self.reg)
         with tf.variable_scope('QueryEncoder'):
             # Create the GRU cell(s)
             single_cell = tf.nn.rnn_cell.GRUCell(self.q_dim)
@@ -63,6 +64,7 @@ class HRED(object):
             word_embeddings = tf.nn.embedding_lookup(E, query)
             word_embeddings = tf.split(0, word_embeddings.get_shape()[0].value, word_embeddings)#unpack_sequence(word_embeddings)
             _, Q = tf.nn.rnn(cell, word_embeddings, dtype=tf.float32)
+            Q = tf.concat(1, [Q, click_hot])
         with tf.variable_scope('SessionEncoder'):
             # Create the GRU cell(s)
             single_cell = tf.nn.rnn_cell.GRUCell(self.s_dim)
@@ -80,12 +82,12 @@ class HRED(object):
             else:
                 cell = single_cell
             # Get/create the variables
-            H0 = tf.get_variable('weights', (self.s_dim, self.q_dim), initializer=self.init)#, regularizer=self.reg)
+            H0 = tf.get_variable('weights', (self.s_dim, self.q_dim), initializer=self.init, regularizer=self.reg)
             b0 = tf.get_variable('bias', (1, self.q_dim), initializer=tf.constant_initializer(0.0))
-            Ho = tf.get_variable('omega_Hweights', (self.q_dim, self.o_dim), initializer=self.init)#, regularizer=self.reg)
-            Eo = tf.get_variable('omega_Eweights', (self.q_dim, self.o_dim), initializer=self.init)#, regularizer=self.reg)
+            Ho = tf.get_variable('omega_Hweights', (self.q_dim, self.o_dim), initializer=self.init, regularizer=self.reg)
+            Eo = tf.get_variable('omega_Eweights', (self.q_dim, self.o_dim), initializer=self.init, regularizer=self.reg)
             bo = tf.get_variable('omega_bias', (1, self.o_dim), initializer=tf.constant_initializer(0.0))
-            O = tf.get_variable('embedding', (self.o_dim, self.vocab_size), initializer=self.init)#, regularizer=self.reg)
+            O = tf.get_variable('embedding', (self.o_dim, self.vocab_size), initializer=self.init, regularizer=self.reg)
             # According to the paper, this is how s is used to generate the query
             state = tf.tanh(tf.matmul(S, H0) + b0)
             word_embeddings = tf.nn.embedding_lookup(E, target)
@@ -120,19 +122,18 @@ class HRED(object):
         # Calculate the length of the query (e.g. the part that is not equal to the padding)
         query_len = tf.reduce_sum(tf.cast(tf.not_equal(labels, utils.PAD_ID), tf.int32))
         # Select only the parts that correspond to the actual query
-        #lbls = tf.one_hot(labels[:query_len], self.vocab_size, axis=-1)
-        lbls = tf.cast(labels[:query_len], tf.int32)
+        lbls = tf.one_hot(labels[:query_len], self.vocab_size, axis=-1)
         inpts = tf.cast(logits[:query_len], tf.float32)
-        softmax_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(inpts, lbls)#tf.nn.softmax_cross_entropy_with_logits(inpts, lbls)
-        loss = tf.reduce_mean(softmax_loss)
-        tf.summary.scalar('softmax_loss', loss)
+        softmax_loss = tf.nn.softmax_cross_entropy_with_logits(inpts, lbls)
+        softmax_loss = tf.reduce_mean(softmax_loss)
+        tf.summary.scalar('softmax_loss', softmax_loss)
         # Add the weight regularization loss
-#        reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
-#        reg_loss = tf.reduce_sum(reg_losses)
-#        tf.summary.scalar('regularization_loss', reg_loss)
-#        
-#        loss = tf.add(softmax_loss, reg_loss)
-#        tf.summary.scalar('total_loss', loss)
+        reg_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+        reg_loss = tf.reduce_sum(reg_losses)
+        tf.summary.scalar('regularization_loss', reg_loss)
+        
+        loss = tf.add(softmax_loss, reg_loss)
+        tf.summary.scalar('total_loss', loss)
     ########################
     # END OF YOUR CODE    #
     #######################
