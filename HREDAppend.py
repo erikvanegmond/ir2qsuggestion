@@ -52,7 +52,13 @@ def next_query_hred_prediction(sessions, experiment_string, csv):
     for i, session in enumerate(sessions):
         anchor_query = session[-2]
         HREDFeatures = getHRED_features(anchor_query)
-        dataf[i]['HRED'] = HREDFeatures
+#        print(dataf['HRED'][i])
+#        print(HREDFeatures)
+        count = 0
+        for x in range((i*20), ((i + 1) * 20)):
+            dataf.set_value('HRED', x, HREDFeatures[count])
+            count += 1
+#        dataf['HRED'][i] = HREDFeatures
         used_sess += 1
         if used_sess % 1000 == 0:
             print("[Visited %s anchor queries.]" % used_sess)
@@ -83,7 +89,10 @@ def make_long_tail_hred_set(sessions, experiment_string, csv):
         if not_longtail:
             continue
         HREDFeatures = getHRED_features(anchor_query)
-        dataf[i]['HRED'] = HREDFeatures
+        count = 0
+        for x in range((i*20), ((i + 1) * 20)):
+            dataf.set_value('HRED', x, HREDFeatures[count])
+            count += 1
         used_sess += 1
         if used_sess % 1000 == 0:
             print("[Visited %s anchor queries.]" % used_sess)
