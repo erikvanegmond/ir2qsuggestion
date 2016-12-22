@@ -15,22 +15,22 @@ hred_use = False
 training = True
 
 import features.adj as ad
-import features.cossimilar as cs
-import features.length as lg
-import features.lengthdiff as ld
-import features.levenstein as levs
-if hred_use == True:
-    import features.HRED as hredf
-import features.bg_count as bgcount
+#import features.cossimilar as cs
+#import features.length as lg
+#import features.lengthdiff as ld
+#import features.levenstein as levs
+#if hred_use == True:
+#    import features.HRED as hredf
+#import features.bg_count as bgcount
 
-adj = ad.ADJ()
-lev = levs.Levenshtein()
-lendif = ld.LengthDiff()
-leng = lg.Length()
-coss = cs.CosineSimilarity()
-if hred_use == True:
-    hred = hredf.HRED()
-bgc = bgcount.BgCount()
+adj = ad.ADJ(train_sessions_file='', bg_sessions_file='')
+#lev = levs.Levenshtein()
+#lendif = ld.LengthDiff()
+#leng = lg.Length()
+#coss = cs.CosineSimilarity()
+#if hred_use == True:
+#    hred = hredf.HRED()
+#bgc = bgcount.BgCount()
 
 
 def get_query_index_pointers(dataset):
