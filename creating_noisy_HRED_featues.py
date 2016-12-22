@@ -12,7 +12,7 @@ import numpy as np
 from datetime import datetime
 import pickle
 import os
-import Pandas as pd
+import pandas as pd
 
 from RNNTensors.TFmodel import HRED
 import utils
@@ -28,7 +28,7 @@ S_DIM_DEFAULT = 1500
 VOCAB_DIM_DEFAULT = 90004
 NUM_LAYERS_DEFAULT = 1
 # Directory for tensorflow logs
-CHECKPOINT_DIR_DEFAULT = '../checkpoints/plain_model'
+CHECKPOINT_DIR_DEFAULT = '../checkpoints/sessionwise'
 ### --- END default constants---
                 
 def feature_extraction(sessions):
@@ -52,12 +52,6 @@ def feature_extraction(sessions):
     sess = tf.Session()      
     saver.restore(sess, tf.train.latest_checkpoint(FLAGS.checkpoint_dir))
     print('Model was restored.')
-    # Check if you have features already
-    if os.path.isfile(feature_file):
-        print('[%s already exists, opening file...]')
-        features = pickle.load(open(feature_file, 'rb'))
-    else:
-        features = {}
 
     time = datetime.now().strftime('%d-%m %H:%M:%S')
     print("[%s: Creating features...]" % time)
@@ -78,28 +72,24 @@ def feature_extraction(sessions):
             x2 = pad_query(num_query, pad_size=FLAGS.padding, q_type='dec_input')
             state = sess.run(S, feed_dict={query: x1, dec_input: x2, s0: state})
         # Calculate the likelihood between the queries
-        if anchor_query not in features.keys():
-            print('Unknown anchor query: ' + anchor_query)
-            features[anchor_query] = {}
         hred_features = []
         for sug_query in highest_adj_queries:
-            if sug_query in features[anchor_query].keys():
-                hred_features.append(features[anchor_query][sug_query])
-                continue
-            else:
-                num_anchor_query = utils.vectorify(anchor_query)
-                x1 = pad_query(num_anchor_query, pad_size=FLAGS.padding)
-                num_sug_query = utils.vectorify(sug_query)
-                x2 = pad_query(num_sug_query, pad_size=FLAGS.padding, q_type='dec_input')
-                y = pad_query(num_sug_query, pad_size=FLAGS.padding, q_type='target')
-                # Get the likelihood from the model
-                like = sess.run(preds, feed_dict={query: x1, dec_input: x2, s0: state})   
-                features[anchor_query][sug_query] = likelihood(like, y)
-                hred_features.append(features[anchor_query][sug_query])
+            num_anchor_query = utils.vectorify(anchor_query)
+            x1 = pad_query(num_anchor_query, pad_size=FLAGS.padding)
+            num_sug_query = utils.vectorify(sug_query)
+            x2 = pad_query(num_sug_query, pad_size=FLAGS.padding, q_type='dec_input')
+            y = pad_query(num_sug_query, pad_size=FLAGS.padding, q_type='target')
+            # Get the likelihood from the model
+            like = sess.run(preds, feed_dict={query: x1, dec_input: x2, s0: state})
+            hred_features.append(likelihood(like, y))
         # Add the HRED features to the feature collection
         features = np.vstack((features, np.transpose(np.array(hred_features))))
         target_vector = np.zeros(len(highest_adj_queries))
-        [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
+        index_list = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
+        if index_list == []:
+            continue
+        else:
+            [target_query_index] = [q for q, x in enumerate(highest_adj_queries) if x == target_query]
         target_vector[target_query_index] = 1
         sess_data = np.vstack((np.transpose(target_vector), features))
         if queries == 0:
@@ -117,7 +107,7 @@ def feature_extraction(sessions):
         
 def likelihood(preds, target_query):
     # Calculate the query likelihood without taking the padding into account
-    L = 1
+    L = 0.0
     for i, word in enumerate(target_query):
         if word == utils.PAD_ID:
             break
@@ -168,6 +158,7 @@ def main(_):
     print("[%s: Loading sessions %s]" % (time, data_file))
     pkl_file = open(data_file, 'rb')
     sessions = pickle.load(pkl_file)
+    sessions = sessions[:15000]
     pkl_file.close()
     print("[Loaded %s test sessions. It took %f seconds.]" % (len(sessions), (datetime.now() - start_time).seconds))
     

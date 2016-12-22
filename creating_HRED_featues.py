@@ -27,7 +27,7 @@ S_DIM_DEFAULT = 1500
 VOCAB_DIM_DEFAULT = 90004
 NUM_LAYERS_DEFAULT = 1
 # Directory for tensorflow logs
-CHECKPOINT_DIR_DEFAULT = '../checkpoints/plain_model'
+CHECKPOINT_DIR_DEFAULT = '../checkpoints/sessionwise'
 ### --- END default constants---
                 
 def feature_extraction(sessions, long_tail=False):
@@ -96,7 +96,7 @@ def feature_extraction(sessions, long_tail=False):
             # Calculate the likelihood between the queries
             for sug_query in highest_adj_queries:
                 if sug_query in features[anchor_query].keys():
-                    break
+                    continue
                 else:
                     num_anchor_query = utils.vectorify(anchor_query)
                     x1 = pad_query(num_anchor_query, pad_size=FLAGS.padding)

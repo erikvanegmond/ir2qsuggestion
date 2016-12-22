@@ -4,14 +4,14 @@ import logging
 #import pickle as pkl
 #import random
 from collections import Counter
-from itertools import izip
+#from itertools import izip
 
 import numpy as np
 import pandas as pd
 #from rankpy.models import LambdaMART
 #from rankpy.queries import Queries
 
-hred_use = True
+hred_use = False
 training = True
 
 import features.adj as ad
