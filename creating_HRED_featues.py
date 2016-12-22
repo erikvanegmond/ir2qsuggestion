@@ -11,7 +11,7 @@ import tensorflow as tf
 import numpy as np
 from datetime import datetime
 import pickle
-import os
+import pandas as pd
 
 from RNNTensors.TFmodel import HRED
 import utils
@@ -30,11 +30,10 @@ NUM_LAYERS_DEFAULT = 1
 CHECKPOINT_DIR_DEFAULT = '../checkpoints/sessionwise'
 ### --- END default constants---
                 
-def feature_extraction(sessions, long_tail=False):
+def feature_extraction(sessions, dataf, long_tail=False):
     """
     This method is used to retrieve the likelohood of different query pairs, given a session.
     """
-    feature_file = '../data/HRED_features.tf.pkl'
     # Create model
     model = HRED(FLAGS.vocab_dim, FLAGS.q_dim, FLAGS.s_dim, 300, FLAGS.num_layers)
     # Feeds for inputs.
@@ -52,17 +51,12 @@ def feature_extraction(sessions, long_tail=False):
     with tf.Session() as sess:        
         saver.restore(sess, tf.train.latest_checkpoint(FLAGS.checkpoint_dir))
         print('Model was restored.')
-        if os.path.isfile(feature_file):
-            print('[%s already exists, opening file...]')
-            features = pickle.load(open(feature_file, 'rb'))
-        else:
-            features = {}
         queries = 0
         
         start_time = datetime.now()
         time = start_time.strftime('%d-%m %H:%M:%S')
         print("[%s: Creating features...]" % time)
-        for session in sessions:           
+        for i, session in enumerate(sessions):           
             if long_tail:
                 anchor_query = session[-2]
                 # Iteratively shorten anchor query by dropping terms
@@ -90,33 +84,29 @@ def feature_extraction(sessions, long_tail=False):
             anchor_query = session[-2]
             adj_dict = lm.adj.adj_function(anchor_query)
             highest_adj_queries = adj_dict['adj_queries']
-            if anchor_query not in features.keys():
-                print('Unknown anchor query: ' + anchor_query)
-                features[anchor_query] = {}
             # Calculate the likelihood between the queries
+            hred = []
             for sug_query in highest_adj_queries:
-                if sug_query in features[anchor_query].keys():
-                    continue
-                else:
-                    num_anchor_query = utils.vectorify(anchor_query)
-                    x1 = pad_query(num_anchor_query, pad_size=FLAGS.padding)
-                    num_sug_query = utils.vectorify(sug_query)
-                    x2 = pad_query(num_sug_query, pad_size=FLAGS.padding, q_type='dec_input')
-                    y = pad_query(num_sug_query, pad_size=FLAGS.padding, q_type='target')
-                    # Get the likelihood from the model
-                    like = sess.run(preds, feed_dict={query: x1, dec_input: x2, s0: state})   
-                    features[anchor_query][sug_query] = likelihood(like, y)
+                num_anchor_query = utils.vectorify(anchor_query)
+                x1 = pad_query(num_anchor_query, pad_size=FLAGS.padding)
+                num_sug_query = utils.vectorify(sug_query)
+                x2 = pad_query(num_sug_query, pad_size=FLAGS.padding, q_type='dec_input')
+                y = pad_query(num_sug_query, pad_size=FLAGS.padding, q_type='target')
+                # Get the likelihood from the model
+                like = sess.run(preds, feed_dict={query: x1, dec_input: x2, s0: state})   
+                hred.append(likelihood(like, y))
             queries += 1
+            dataf.loc[(i*20):((i + 1) * 20 - 1), 'HRED'] = hred
                     
-            if queries % 10000 == 0:
+            if queries % 1000 == 0:
                 print("[Visited %s anchor queries.]" % (queries))
-        print("[Saving features %s features.]" % (len(features)))
-        pickle.dump(features, open(feature_file, 'wb'))
+        print("[Saving %s queries.]" % (queries*20))
+        dataf.to_csv('../data/lamdamart_data_next_query_plain_model'+FLAGS.data_set+'.csv')
         print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
         
 def likelihood(preds, target_query):
     # Calculate the query likelihood without taking the padding into account
-    L = 1
+    L = 0.0
     for i, word in enumerate(target_query):
         if word == utils.PAD_ID:
             break
@@ -177,11 +167,15 @@ def main(_):
     pkl_file = open(data_file, 'rb')
     sessions = pickle.load(pkl_file)
     pkl_file.close()
-    print("[Loaded %s test sessions. It took %f seconds.]" % (len(sessions), (datetime.now() - start_time).seconds))
+    print("[Loaded %s test sessions. It took %f seconds.]" % (len(sessions), (datetime.now() - start_time).seconds))    
+    
+    # Load the csv data
+    csv_file = '../data/lamdamart_data_next_query_' + FLAGS.data_set + '.csv'
+    dataf = pd.read_csv(csv_file)
     
     # Run feature extraction
     print('[Creating dataset for next_query predictions.]')
-    feature_extraction(sessions)
+    feature_extraction(sessions, dataf)
     print("---" * 30)
     
 #    print('[Creating dataset for noisy_query predictions.]')
@@ -189,9 +183,9 @@ def main(_):
 #    feature_extraction(noisy_query_sessions)
 #    print("---" * 30)
     
-    print('[Creating dataset for long_tail_query predictions.]')
-    feature_extraction(sessions, True)
-    print("---" * 30)
+#    print('[Creating dataset for long_tail_query predictions.]')
+#    feature_extraction(sessions, True)
+#    print("---" * 30)
 
 if __name__ == '__main__':
     # Command line arguments
