@@ -29,7 +29,7 @@ VOCAB_DIM_DEFAULT = 90004
 NUM_LAYERS_DEFAULT = 1
 CLICK_LEVEL = 5
 # Directory for tensorflow logs
-CHECKPOINT_DIR_DEFAULT = '../checkpoints/plain_model'
+CHECKPOINT_DIR_DEFAULT = '../click_checkpoints'
 ### --- END default constants---
                 
 def feature_extraction(sessions, clicks, dataf, long_tail=False):
@@ -85,14 +85,14 @@ def feature_extraction(sessions, clicks, dataf, long_tail=False):
                 session_clicks = clicks[i]
                 click_ranks = [x[1]-1 if x[1] <=2 else -1 for x in session_clicks]
                 state = np.zeros((1,FLAGS.s_dim))
-                for i in range(len(session)-2):
+                for j in range(len(session)-2):
                     # Go through the session step by step to get the session encoding up until the ancor query
-                    num_query = utils.vectorify(session[i])
+                    num_query = utils.vectorify(session[j])
                     x1 = pad_query(num_query, pad_size=FLAGS.padding)
-                    num_query = utils.vectorify(session[i+1])
+                    num_query = utils.vectorify(session[j+1])
                     x2 = pad_query(num_query, pad_size=FLAGS.padding, q_type='dec_input')
                     z = np.zeros([FLAGS.click_level])
-                    z[click_ranks[i]] = 1
+                    z[click_ranks[j]] = 1
                     z = np.reshape(z, (1, 5))                    
                     
                     state = sess.run(S, feed_dict={query: x1, dec_input: x2, s0: state, click_hot: z}) 
@@ -118,7 +118,9 @@ def feature_extraction(sessions, clicks, dataf, long_tail=False):
                     
             if queries % 1000 == 0:
                 print("[Visited %s anchor queries. Skipped %s sessions.]" % (queries, bad_session))
-        print("[Saving %s queries.]" % (queries*20))
+            if queries == 15000:
+                break
+        print("[Saving %s queries. Skipped %s sessions.]" % (queries*20, bad_session))
         dataf.to_csv('../data/lamdamart_data_next_query_click_model'+FLAGS.data_set+'.csv')
         print("[It took %d seconds.]" % ((datetime.now() - start_time).seconds))
         
@@ -175,8 +177,6 @@ def main(_):
     """
     Main function
     """
-    # Print all Flags to confirm parameter settings
-    print_flags()
     # Load data
     start_time = datetime.now()
     time = start_time.strftime('%d-%m %H:%M:%S')
@@ -185,14 +185,17 @@ def main(_):
 #    pkl_file = open(data_file, 'rb')
 #    sessions = pickle.load(pkl_file)
 #    pkl_file.close()
-    snizer = Sessionizer()
+    snizer = Sessionizer('../data/'+FLAGS.data_set+'_session')
     sessions = snizer.get_sessions()
     clicks = snizer.get_sessions_clickBool_clickRank()
-    print("[Loaded %s test sessions. It took %f seconds.]" % (len(sessions), (datetime.now() - start_time).seconds))    
+    print("[Loaded %s sessions and %s clicks.]" % (len(sessions), len(clicks)))    
     
     # Load the csv data
+    time = datetime.now().strftime('%d-%m %H:%M:%S')
+    print("[%s: Loading csv file]" % (time))
     csv_file = '../data/lamdamart_data_next_query_' + FLAGS.data_set + '.csv'
     dataf = pd.read_csv(csv_file)
+    print('[csv loaded of size: %s]' % len(dataf))
     
     # Run feature extraction
     print('[Creating dataset for next_query predictions.]')

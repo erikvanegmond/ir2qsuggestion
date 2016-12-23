@@ -68,44 +68,58 @@ print('[Creating next_query features.]')
 # create_noisy_query_csv()
 #Add the csv here...
 
-csv_lttr = "../data/lamdamart_data_long_tail_train.csv"
-csv_ltval = "../data/lamdamart_data_long_tail_val.csv"
-csv_lttst = "../data/lamdamart_data_long_tail_test.csv"
+#csv_lttr = "../data/lamdamart_data_long_tail_train.csv"
+#csv_ltval = "../data/lamdamart_data_long_tail_val.csv"
+#csv_lttst = "../data/lamdamart_data_long_tail_test.csv"
+#
+#csv_nqtr = "../data/lamdamart_data_next_query.csv"
+#csv_nqval = "../data/lamdamart_data_next_query_val.csv"
+#csv_nqtst = "../data/lamdamart_data_next_query_test.csv"
+#
+#csv_notr = "../data/lamdamart_data_noisy_train.csv"
+#csv_noval = "../data/lamdamart_data_noisy_val.csv"
+#csv_notst = "../data/lamdamart_data_noisy_test.csv"
+#
+#sessions_tr = lm.adj.find_suitable_sessions("../data/lm_train_sessions.pkl")
+#sessions_val = lm.adj.find_suitable_sessions("../data/lm_val_sessions.pkl")
+#sessions_test = lm.adj.find_suitable_sessions("../data/lm_test_sessions.pkl")
 
-csv_nqtr = "../data/lamdamart_data_next_query.csv"
-csv_nqval = "../data/lamdamart_data_next_query_val.csv"
-csv_nqtst = "../data/lamdamart_data_next_query_test.csv"
+sessions = lm.adj.find_suitable_sessions("../data/lm_train_sessions.pkl")
+sessions = sessions[:15000]
+csv_file = "../data/lamdamart_data_next_query.csv"
+create_next_query_csv(sessions, csv_file)
+csv_file = "../data/lamdamart_data_noisy_train.csv"
+create_noisy_query_csv(sessions, csv_file)
+csv_file = "../data/lamdamart_data_long_tail_train.csv"
+create_longtail_query_csv(sessions, csv_file)
 
-csv_notr = "../data/lamdamart_data_noisy_train.csv"
-csv_noval = "../data/lamdamart_data_noisy_val.csv"
-csv_notst = "../data/lamdamart_data_noisy_test.csv"
+sessions = lm.adj.find_suitable_sessions("../data/lm_test_sessions.pkl")
+sessions = sessions[:15000]
+csv_file = "../data/lamdamart_data_next_query_test.csv"
+create_next_query_csv(sessions, csv_file)
+csv_file = "../data/lamdamart_data_noisy_test.csv"
+create_noisy_query_csv(sessions, csv_file)
+csv_file = "../data/lamdamart_data_long_tail_test.csv"
+create_longtail_query_csv(sessions, csv_file)
 
-sessions_tr = lm.adj.find_suitable_sessions("../data/lm_train_sessions.pkl")
-sessions_val = lm.adj.find_suitable_sessions("../data/lm_val_sessions.pkl")
-sessions_test = lm.adj.find_suitable_sessions("../data/lm_test_sessions.pkl")
-
-create_next_query_csv(sessions_tr, csv_nqtr)
-create_next_query_csv(sessions_val, csv_nqval)
-create_next_query_csv(sessions_test, csv_nqtst)
-
-print('[Creating noisy_query features.]')
+#print('[Creating noisy_query features.]')
 # create_next_query_csv()
 # create_noisy_query_csv()
 #sessions_tr = lm.adj.find_suitable_sessions("../data/lm_train_sessions.pkl")
-create_noisy_query_csv(sessions_tr, csv_notr)
+#create_noisy_query_csv(sessions_tr, csv_notr)
 #sessions_val = lm.adj.find_suitable_sessions("../data/lm_val_sessions.pkl")
-create_noisy_query_csv(sessions_val, csv_noval)
+#create_noisy_query_csv(sessions_val, csv_noval)
 #sessions_test = lm.adj.find_suitable_sessions("../data/lm_test_sessions.pkl")
-create_noisy_query_csv(sessions_test, csv_notst)
+#create_noisy_query_csv(sessions_test, csv_notst)
     
-print('[Creating long_tail features.]')
+#print('[Creating long_tail features.]')
 # create_next_query_csv()
 # create_noisy_query_csv()
 #sessions_tr = lm.adj.find_suitable_sessions("../data/lm_train_sessions.pkl")
-create_longtail_query_csv(sessions_tr, csv_lttr)
+#create_longtail_query_csv(sessions_tr, csv_lttr)
 #sessions_val = lm.adj.find_suitable_sessions("../data/lm_val_sessions.pkl")
-create_longtail_query_csv(sessions_val, csv_ltval)
+#create_longtail_query_csv(sessions_val, csv_ltval)
 #sessions_test = lm.adj.find_suitable_sessions("../data/lm_test_sessions.pkl")
-create_longtail_query_csv(sessions_test, csv_lttst)
+#create_longtail_query_csv(sessions_test, csv_lttst)
 
 print("done")
